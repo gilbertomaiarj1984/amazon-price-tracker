@@ -34,13 +34,12 @@ export type CollectOutcome =
   | { ok: false; kind: BlockKind; falhasProduto: number; avisarProduto: boolean };
 
 /**
- * O painel só é buscado quando precisa: linhas extras ligadas, ou quando a Amazon pode estar vendendo fora da caixa de compra.
- * Com "Amazon Global" na caixa de compra, a Amazon.com.br pode ter uma oferta mais barata fora dela, e a página
- * nem sempre mostra a contagem de outras opções: o painel é buscado sempre.
+ * O painel só é buscado quando precisa: linhas extras ligadas, ou quando a caixa de compra não é da Amazon.
+ * A Amazon pode vender fora da caixa de compra (ex.: Amazon Global a R$ 404 enquanto a caixa mostra um terceiro a R$ 469),
+ * e a página nem sempre mostra a contagem de outras opções, então a contagem não decide: sem caixa da Amazon, busca.
  */
 export function needsPanel(p: Product, page: ProductPage): boolean {
   const global = /global/i.test(page.buyBoxVendedor ?? "");
-  if (!page.outrasOpcoes && !global) return false;
   return p.terceirosOn || p.usadoOn || !page.vendidoPorAmazon || global;
 }
 
