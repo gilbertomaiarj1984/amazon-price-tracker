@@ -99,6 +99,8 @@ export interface LoopOptions {
   sleep: (ms: number, signal: AbortSignal) => Promise<void>;
   signal: AbortSignal;
   now?: () => number;
+  /** Se existir, decide a espera até a próxima rodada (ex.: horários fixos) no lugar do intervalo. */
+  nextDelayMs?: () => number;
   log: (msg: string) => void;
 }
 
@@ -114,6 +116,12 @@ export async function loop(run: () => Promise<unknown>, o: LoopOptions): Promise
       o.log(`rodada falhou: ${(e as Error).message}`);
     }
     if (o.signal.aborted) break;
-    await o.sleep(Math.max(0, o.intervalMs - (now() - t0)) + o.jitterMs(), o.signal);
+    await o.sleep(o.nextDelayMs ? o.nextDelayMs() : Math.max(0, o.intervalMs - (now() - t0)) + o.jitterMs(), o.signal);
   }
+}
+
+/** Ms até o próximo horário fixo da grade (ex.: de 30 em 30 min, :00 e :30), contados do relógio e não do reinício. Sempre > 0. */
+export function msToNextSlot(nowMs: number, intervalMin: number): number {
+  const slot = intervalMin * 60_000;
+  return slot - (nowMs % slot);
 }

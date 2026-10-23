@@ -10,7 +10,7 @@ import { Store } from "./db.ts";
 import { MAX_BODY, panelHandler } from "./panel.ts";
 import { runVarredura, varreduraDevida } from "./sugestoes.ts";
 import { createLock } from "./mutex.ts";
-import { loop, runCycle } from "./scheduler.ts";
+import { loop, msToNextSlot, runCycle } from "./scheduler.ts";
 import { Telegram } from "./telegram.ts";
 import type { Update } from "./telegram.ts";
 import { chatOf } from "./telegram.ts";
@@ -89,8 +89,9 @@ async function poll(): Promise<void> {
 }
 
 const intervalMs = cfg.intervalMin * 60_000;
-const lastCycle = Number(store.getMeta("last_cycle_at") ?? 0);
-const firstDelayMs = Math.max(10_000, intervalMs - (Date.now() - lastCycle));
+// Rodadas em horários fixos (:00 e :30 no padrão), como um cron interno: reiniciar o servidor não dispara coleta.
+const slotDelay = () => msToNextSlot(Date.now(), cfg.intervalMin) + Math.round(Math.random() * 20_000);
+const firstDelayMs = slotDelay();
 
 const cycle = () =>
   runCycle({
@@ -164,8 +165,8 @@ const stop = () => {
 process.on("SIGTERM", stop);
 process.on("SIGINT", stop);
 
-log(`iniciado: ${store.list().length} itens, rodada a cada ${cfg.intervalMin} min, primeira em ${Math.round(firstDelayMs / 1000)} s`);
+log(`iniciado: ${store.list().length} itens, rodada a cada ${cfg.intervalMin} min em horário fixo, primeira em ${Math.round(firstDelayMs / 1000)} s`);
 await send(`<b>Rastreador no ar.</b> ${store.list().length} itens, rodada a cada ${cfg.intervalMin} min. Use <code>/ajuda</code>.`).catch((e) => log(`aviso de início não enviado: ${(e as Error).message}`));
 
-void loop(cycle, { intervalMs, firstDelayMs, jitterMs: () => Math.round(Math.random() * 60_000), sleep, signal: ac.signal, log });
+void loop(cycle, { intervalMs, firstDelayMs, nextDelayMs: slotDelay, jitterMs: () => 0, sleep, signal: ac.signal, log });
 await poll();

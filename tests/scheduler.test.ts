@@ -170,3 +170,11 @@ test("teclado do alerta tem link, histórico e silenciar", () => {
   expect(kb.map((b) => b.text)).toEqual(["Abrir na Amazon", "Ver histórico", "Silenciar 24 h"]);
   expect(kb[0]).toEqual({ text: "Abrir na Amazon", url: "https://www.amazon.com.br/dp/B097BYXGXN" });
 });
+
+describe("msToNextSlot", () => {
+  test("horário fixo: próxima marca da grade, sempre maior que zero", async () => {
+    const { msToNextSlot } = await import("../src/scheduler.ts");
+    expect(msToNextSlot(Date.UTC(2026, 9, 23, 18, 43, 0), 30)).toBe(17 * 60_000);
+    expect(msToNextSlot(Date.UTC(2026, 9, 23, 19, 0, 0), 30)).toBe(30 * 60_000);
+  });
+});
