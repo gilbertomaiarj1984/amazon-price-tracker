@@ -19,9 +19,9 @@ const PRICE_SELECTORS = [
   ".a-price .a-offscreen",
 ];
 const OTHER_OFFERS_SELECTORS = [
-  "#olp_feature_div",
-  "#dynamic-aod-ingress-box",
   "#aod-ingress-link",
+  "#dynamic-aod-ingress-box",
+  "#olp_feature_div",
   "#buybox-see-all-buying-choices",
 ];
 
@@ -119,12 +119,14 @@ export function parseProductPage(html: string): ProductPage {
   }
 
   const other = firstText(root, OTHER_OFFERS_SELECTORS);
+  const opcoes = other ? /(\d+)\s+op[çc][õo]es?/i.exec(other) : null;
   return {
     titulo,
     buyBox,
     buyBoxVendedor: vendedor,
     vendidoPorAmazon: buyBox != null && isAmazonSeller(vendedor),
     outrasAPartirDe: parseBRL(other, { exigirMoeda: true }),
+    outrasOpcoes: opcoes && opcoes[1] ? Number(opcoes[1]) : null,
     disponivel: buyBox != null,
   };
 }
@@ -136,21 +138,40 @@ function parseFrete(block: HTMLElement): number | null {
   return m ? parseBRL(m[1]) : null;
 }
 
+const USED_RE = /usad|recondicion|seminov|como novo|muito bom|bom estado|aceit[aá]vel/i;
+const RETURN_POLICY_RE = /pol[ií]tica de devolu/i;
+
+/** Primeiro texto útil de um bloco "Enviado pela / Vendido por": o nome vem em <span> (Amazon) ou <a> (terceiro). */
+function valueOf(block: HTMLElement, id: string): string {
+  const col = block.querySelector(`[id="${id}"] .a-col-right`);
+  if (!col) return "";
+  for (const el of col.querySelectorAll("a, span")) {
+    const t = txt(el);
+    if (t && !RETURN_POLICY_RE.test(t)) return t;
+  }
+  return "";
+}
+
 export function parseOffersPanel(html: string): Offer[] {
   const root = parse(html);
+  for (const el of root.querySelectorAll("script, style, noscript")) el.remove();
+  // #aod-pinned-offer é a oferta da caixa de compra; #aod-sticky-pinned-offer é só a cópia fixa dela.
   const blocks = root.querySelectorAll('[id="aod-pinned-offer"], [id="aod-offer"]');
   const out: Offer[] = [];
   const seen = new Set<string>();
   for (const b of blocks) {
-    const preco = parseBRL(txt(b.querySelector(".a-price .a-offscreen")));
+    // TODO(calibrar): a estrutura interna de #aod-price-N ainda não foi vista no HTML real.
+    const priceScope = b.querySelector('[id^="aod-price-"]') ?? b.querySelector('[id="aod-offer-price"]') ?? b;
+    let preco: number | null = null;
+    for (const el of priceScope.querySelectorAll(".a-offscreen")) {
+      preco = parseBRL(txt(el), { exigirMoeda: true });
+      if (preco != null) break;
+    }
     if (preco == null) continue;
-    const soldBy =
-      txt(b.querySelector('[id="aod-offer-soldBy"] a')) ||
-      txt(b.querySelector('[id="aod-offer-soldBy"] .a-col-right')) ||
-      "Desconhecido";
-    const shipsFrom = txt(b.querySelector('[id="aod-offer-shipsFrom"] .a-col-right'));
+    const soldBy = valueOf(b, "aod-offer-soldBy") || "Desconhecido";
+    const shipsFrom = valueOf(b, "aod-offer-shipsFrom");
     const heading = txt(b.querySelector('[id="aod-offer-heading"]'));
-    const condicao: Offer["condicao"] = heading && !/^novo/i.test(heading) ? "usado" : "novo";
+    const condicao: Offer["condicao"] = USED_RE.test(heading) ? "usado" : "novo";
     const frete = parseFrete(b);
     const key = `${soldBy}|${condicao}|${preco}|${frete}`;
     if (seen.has(key)) continue;
@@ -160,7 +181,7 @@ export function parseOffersPanel(html: string): Offer[] {
       condicao,
       preco,
       frete,
-      envio: /amazon/i.test(shipsFrom) ? "amazon" : "terceiro",
+      envio: /^amazon/i.test(shipsFrom) ? "amazon" : "terceiro",
       vendidoPorAmazon: isAmazonSeller(soldBy),
     });
   }

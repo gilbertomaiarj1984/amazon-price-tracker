@@ -3,7 +3,7 @@ import { deriveLines, dropSuspects } from "../src/lines.ts";
 import type { Offer, ProductPage } from "../src/types.ts";
 
 const page = (o: Partial<ProductPage> = {}): ProductPage => ({
-  titulo: "x", buyBox: null, buyBoxVendedor: null, vendidoPorAmazon: false, outrasAPartirDe: null, disponivel: false, ...o,
+  titulo: "x", buyBox: null, buyBoxVendedor: null, vendidoPorAmazon: false, outrasAPartirDe: null, outrasOpcoes: null, disponivel: false, ...o,
 });
 const offer = (o: Partial<Offer>): Offer => ({
   vendedor: "Loja", condicao: "novo", preco: 100, frete: 0, envio: "terceiro", vendidoPorAmazon: false, ...o,

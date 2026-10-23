@@ -24,6 +24,8 @@ export interface ProductPage {
   vendidoPorAmazon: boolean;
   /** "a partir de R$ X" das outras opções de compra. */
   outrasAPartirDe: number | null;
+  /** "N opções a partir de…": quantas ofertas além da principal. null = a página não mostra. */
+  outrasOpcoes: number | null;
   disponivel: boolean;
 }
 

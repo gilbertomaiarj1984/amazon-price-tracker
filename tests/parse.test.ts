@@ -80,6 +80,29 @@ describe("parseProductPage com HTML parecido com o real", () => {
   });
 });
 
+describe("ingresso de outras ofertas (texto real)", () => {
+  const pad = "x".repeat(600);
+  const page = (ingress: string) =>
+    `<html><body><div id="dp"><span id="productTitle">Café</span><div id="corePrice_feature_div"><span class="a-price"><span class="a-offscreen">R$16,50</span></span></div>${ingress}<p>${pad}</p></div></body></html>`;
+  test("N opções a partir de R$ X (preço duplicado no texto)", () => {
+    const p = parseProductPage(
+      page('<div id="dynamic-aod-ingress-box"><a id="aod-ingress-link">6 opções a partir de R$16,50R$16,50 Frete GRÁTIS no seu primeiro pedido.</a></div>'),
+    );
+    expect(p.outrasOpcoes).toBe(6);
+    expect(p.outrasAPartirDe).toBe(16.5);
+  });
+  test("32 opções", () => {
+    const p = parseProductPage(page('<div id="aod-ingress-link">32 opções a partir de R$204,10R$204,10 Entrega GRÁTIS.</div>'));
+    expect(p.outrasOpcoes).toBe(32);
+    expect(p.outrasAPartirDe).toBe(204.1);
+  });
+  test("oferta única: sem ingresso, sem painel a buscar", () => {
+    const p = parseProductPage(page(""));
+    expect(p.outrasOpcoes).toBeNull();
+    expect(p.outrasAPartirDe).toBeNull();
+  });
+});
+
 describe("parseOffersPanel", () => {
   const offers = parseOffersPanel(fx("offers-panel.html"));
   test("lê todas as ofertas", () => expect(offers).toHaveLength(6));
@@ -90,6 +113,17 @@ describe("parseOffersPanel", () => {
   test("frete pago e entidade HTML", () => {
     const o = offers.find((x) => x.vendedor === "Casa & Som Outlet");
     expect(o).toMatchObject({ preco: 365, frete: 24.9, envio: "terceiro" });
+  });
+  test("'Compra única' é tipo de compra, não condição usada", () => {
+    expect(offers.filter((o) => o.condicao === "novo")).toHaveLength(5);
+  });
+  test("vendedor vem do span (Amazon) ou do link (terceiro), nunca da política de devolução", () => {
+    expect(offers.map((o) => o.vendedor)).toEqual([
+      "Amazon.com.br", "TechBras Store", "Mega Eletro SP", "Casa & Som Outlet", "OfertaTop99", "Amazon Warehouse",
+    ]);
+  });
+  test("a cópia fixa da oferta principal não conta", () => {
+    expect(offers.some((o) => o.preco === 999)).toBe(false);
   });
   test("usado", () => {
     expect(offers.find((o) => o.condicao === "usado")).toMatchObject({ preco: 301, vendedor: "Amazon Warehouse" });
