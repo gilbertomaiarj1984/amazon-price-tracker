@@ -43,6 +43,43 @@ describe("parseProductPage", () => {
   });
 });
 
+describe("parseProductPage com HTML parecido com o real", () => {
+  const pad = "x".repeat(600);
+  const wrap = (body: string) => `<html><body><div id="dp"><span id="productTitle">Disco</span>${body}<p>${pad}</p></div></body></html>`;
+
+  test("script dentro do bloco de ofertas não vira preço", () => {
+    const p = parseProductPage(
+      wrap(`<div id="olp_feature_div"><script>P.when("A","load").execute("aod-assets-loaded", function(A){ var x = 1; })</script></div>
+            <div id="corePrice_feature_div"><span class="a-price"><span class="a-offscreen">R$275,28</span></span></div>`),
+    );
+    expect(p.outrasAPartirDe).toBeNull();
+    expect(p.buyBox).toBe(275.28);
+  });
+  test("preço sem espaço depois do R$", () => {
+    expect(parseProductPage(wrap('<div id="corePrice_feature_div"><span class="a-price"><span class="a-offscreen">R$281,60</span></span></div>')).buyBox).toBe(281.6);
+  });
+  test("Amazon.com.br pelo bloco de envio/venda", () => {
+    const p = parseProductPage(
+      wrap(`<div id="corePrice_feature_div"><span class="a-price"><span class="a-offscreen">R$275,28</span></span></div>
+            <div id="merchantInfoFeature_feature_div"><div class="offer-display-feature-text"><span class="offer-display-feature-text-message">Amazon.com.br</span></div></div>`),
+    );
+    expect(p.buyBoxVendedor).toBe("Amazon.com.br");
+    expect(p.vendidoPorAmazon).toBe(true);
+  });
+  test("Amazon Global conta como Amazon", () => {
+    const p = parseProductPage(
+      wrap(`<div id="corePrice_feature_div"><span class="a-price"><span class="a-offscreen">R$272,79</span></span></div><a id="sellerProfileTriggerId">Amazon Global</a>`),
+    );
+    expect(p.vendidoPorAmazon).toBe(true);
+  });
+  test("Amazon Warehouse (usado) não conta como Amazon nova", () => {
+    const p = parseProductPage(
+      wrap(`<div id="corePrice_feature_div"><span class="a-price"><span class="a-offscreen">R$100,00</span></span></div><a id="sellerProfileTriggerId">Amazon Warehouse</a>`),
+    );
+    expect(p.vendidoPorAmazon).toBe(false);
+  });
+});
+
 describe("parseOffersPanel", () => {
   const offers = parseOffersPanel(fx("offers-panel.html"));
   test("lê todas as ofertas", () => expect(offers).toHaveLength(6));

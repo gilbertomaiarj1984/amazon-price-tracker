@@ -34,8 +34,9 @@ const CAPTCHA_MARKERS = [
   "api-services-support@amazon.com",
 ];
 
-export function parseBRL(text: string | null | undefined): number | null {
+export function parseBRL(text: string | null | undefined, opts: { exigirMoeda?: boolean } = {}): number | null {
   if (!text) return null;
+  if (opts.exigirMoeda && !text.includes("R$")) return null;
   const clean = text.replace(/\u00a0/g, " ");
   // Com "R$" no texto, o valor é o que vem depois dele ("Novo (3) a partir de R$ 1.189,00").
   const from = clean.indexOf("R$");
@@ -78,13 +79,19 @@ export function detectBlock(
   return "ok";
 }
 
+/**
+ * "Amazon Global" (importação operada pela Amazon) conta como Amazon.
+ * "Amazon Warehouse" é usado e fica de fora.
+ */
 function isAmazonSeller(name: string | null | undefined): boolean {
   if (!name) return false;
-  return /^amazon(\.com\.br)?$/i.test(name.trim());
+  return /^amazon(\.com\.br| global)?$/i.test(name.trim());
 }
 
 export function parseProductPage(html: string): ProductPage {
   const root = parse(html);
+  // A página real traz ~1 MB de scripts, e alguns ficam dentro de contêineres que o parser lê como texto.
+  for (const el of root.querySelectorAll("script, style, noscript")) el.remove();
   let titulo = txt(root.querySelector("#productTitle")) || null;
   if (!titulo) {
     const t = txt(root.querySelector("title"));
@@ -117,7 +124,7 @@ export function parseProductPage(html: string): ProductPage {
     buyBox,
     buyBoxVendedor: vendedor,
     vendidoPorAmazon: buyBox != null && isAmazonSeller(vendedor),
-    outrasAPartirDe: parseBRL(other),
+    outrasAPartirDe: parseBRL(other, { exigirMoeda: true }),
     disponivel: buyBox != null,
   };
 }
