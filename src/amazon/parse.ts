@@ -239,3 +239,46 @@ export function parseOffersPanel(html: string): Offer[] {
   }
   return out;
 }
+
+export interface Variante {
+  asin: string;
+  /** "Vinil", "CD", "Capa dura", "Preto"... Vazio se a página não nomeou. */
+  rotulo: string;
+  /** tmm = seletor de formatos (livro, música, filme); twister = outras variações (cor, tamanho, edição). */
+  dimensao: "formato" | "variacao";
+  selecionada: boolean;
+  preco: number | null;
+}
+
+const ASIN_ATTR_RE = /^[A-Z0-9]{10}$/;
+
+/**
+ * Variações listadas na própria página do produto: seletor de formatos (#tmmSwatches) e seletor de
+ * variações (#twister). A lista vem do HTML estático; variações carregadas depois por script não aparecem.
+ */
+export function parseVariantes(html: string): Variante[] {
+  const root = parse(html);
+  for (const el of root.querySelectorAll("script, style, noscript")) el.remove();
+  const out: Variante[] = [];
+  const seen = new Set<string>();
+  const scopes: Array<[string, Variante["dimensao"]]> = [
+    ["#tmmSwatches", "formato"],
+    ["#twister", "variacao"],
+    ["#twister_feature_div", "variacao"],
+    ["#twister-plus-inline-twister-card", "variacao"],
+  ];
+  for (const [sel, dimensao] of scopes) {
+    const scope = root.querySelector(sel);
+    if (!scope) continue;
+    for (const el of scope.querySelectorAll("[data-asin], [data-defaultasin]")) {
+      const asin = (el.getAttribute("data-asin") || el.getAttribute("data-defaultasin") || "").toUpperCase();
+      if (!ASIN_ATTR_RE.test(asin) || seen.has(asin)) continue;
+      seen.add(asin);
+      const cls = el.getAttribute("class") ?? "";
+      const preco = parseBRL(txt(el.querySelector(".slot-price, .a-color-secondary, .a-color-price")), { exigirMoeda: true });
+      const rotulo = txt(el.querySelector(".a-button-text > span, .swatch-title-text, .a-button-text")).replace(/R\$\s*[\d.,]+.*$/, "").trim();
+      out.push({ asin, rotulo, dimensao, selecionada: /\bselected\b|a-button-selected/.test(cls) || !!el.querySelector(".a-button-selected"), preco });
+    }
+  }
+  return out;
+}

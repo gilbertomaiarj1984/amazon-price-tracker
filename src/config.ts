@@ -11,6 +11,8 @@ export interface Config {
   panelToken: string | null;
   /** PANEL_READONLY=1 desliga as ações de escrita do painel (cadastrar, alvo, pausar, linhas, remover). */
   panelReadonly: boolean;
+  /** Varredura diária de equivalentes vendidos pela Amazon (SUGESTOES=0 desliga). */
+  sugestoes: { hora: number; maxItens: number; maxCandidatos: number; pausaMinMs: number; pausaMaxMs: number } | null;
 }
 
 function intOf(env: Record<string, string | undefined>, key: string, def: number, min: number): number {
@@ -30,7 +32,17 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   if (panelToken && panelToken.length < 24) throw new Error("PANEL_TOKEN curto demais: use pelo menos 24 caracteres (openssl rand -hex 24)");
   const reqMinMs = intOf(env, "REQ_MIN_MS", 2000, 500);
   const reqMaxMs = intOf(env, "REQ_MAX_MS", 5000, reqMinMs);
+  const pausaMinMs = intOf(env, "SUGESTOES_PAUSA_MIN_MS", 15_000, 2000);
   return {
+    sugestoes: /^(0|false|nao|não)$/i.test(env["SUGESTOES"]?.trim() ?? "")
+      ? null
+      : {
+          hora: Math.min(23, intOf(env, "SUGESTOES_HORA", 4, 0)),
+          maxItens: intOf(env, "SUGESTOES_MAX_ITENS", 10, 1),
+          maxCandidatos: intOf(env, "SUGESTOES_MAX_CANDIDATOS", 4, 1),
+          pausaMinMs,
+          pausaMaxMs: intOf(env, "SUGESTOES_PAUSA_MAX_MS", 30_000, pausaMinMs),
+        },
     botToken,
     chatId: Number(chat),
     dbPath: env["DB_PATH"]?.trim() || "./data/tracker.db",

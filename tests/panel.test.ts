@@ -522,3 +522,40 @@ test("card do grupo ganha sinalizador verde quando há item dentro do alvo", asy
   expect(js).toContain("status(x).k==='below'");
   expect(js).toContain("dentro do alvo</span>':''");
 });
+
+describe("sugestões", () => {
+  const post = (path: string, h: Record<string, string> = {}) =>
+    handle(new Request(`http://x${path}`, { method: "POST", headers: { origin: "http://x", "x-painel": "1", "content-type": "application/json", ...h }, body: "{}" }));
+  let sid: number;
+  beforeEach(() => {
+    const net = fakeNet();
+    handle = panelHandler({ store, now: () => NOW, intervalMin: 30, collect: (p) => collectOne(store, p, net.deps), resolve: async () => ({ ok: false, motivo: "sem_link" }) });
+    const o = store.getByAsin("B097BYXGXN")!;
+    store.addSugestao({ origemId: o.id, asin: "B00C061AAA", titulo: "Outra edição", formato: "CD", formatoOrigem: "Vinil", certeza: "baixa", preco: 59.9, vendedor: "Amazon", criadoEm: NOW.toISOString() });
+    sid = store.listSugestoes()[0]!.id;
+  });
+
+  test("aparecem em /api/itens com o item de origem", async () => {
+    const j = (await (await get("/api/itens")).json()) as { sugestoes: Array<{ asin: string; origem: { num: number } }> };
+    expect(j.sugestoes).toMatchObject([{ asin: "B00C061AAA", origem: { num: 1 } }]);
+  });
+
+  test("aceitar cadastra o item e agrupa; recusar some e não volta", async () => {
+    const r = await post(`/api/sugestoes/${sid}/aceitar`);
+    expect(r.status).toBe(200);
+    expect(store.getByAsin("B00C061AAA")?.grupoId).not.toBeNull();
+    expect((await post(`/api/sugestoes/${sid}/aceitar`)).status).toBe(409);
+    const o = store.getByAsin("B097BYXGXN")!;
+    store.addSugestao({ origemId: o.id, asin: "B00C061BBB", titulo: null, formato: null, formatoOrigem: null, certeza: "media", preco: 10, vendedor: "Amazon", criadoEm: NOW.toISOString() });
+    const id2 = store.listSugestoes()[0]!.id;
+    expect((await post(`/api/sugestoes/${id2}/recusar`)).status).toBe(200);
+    expect(store.asinRecusado("B00C061BBB")).toBe(true);
+  });
+
+  test("escrita exige a origem do painel e não existe em modo somente leitura", async () => {
+    expect((await post(`/api/sugestoes/${sid}/aceitar`, { origin: "http://evil" })).status).toBe(403);
+    handle = panelHandler({ store, now: () => NOW, intervalMin: 30, somenteLeitura: true });
+    expect((await post(`/api/sugestoes/${sid}/aceitar`)).status).toBe(405);
+    expect(store.getSugestao(sid)!.status).toBe("pendente");
+  });
+});

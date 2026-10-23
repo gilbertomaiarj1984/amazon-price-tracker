@@ -233,3 +233,22 @@ test("nenhuma mensagem do bot vaza HTML cru do usuário", async () => {
   expect(texts()).not.toContain("<b>oi</b>");
   expect(texts()).toContain("<b>&lt;b&gt;oi&lt;/b&gt; &amp; Cia</b>");
 });
+
+describe("sugestões no Telegram", () => {
+  test("Rastrear cadastra e agrupa; Recusar não deixa voltar", async () => {
+    const store = new Store(":memory:");
+    const o = store.addProduct("B00C061HZY", "Random Access Memories", "2026-10-23T00:00:00.000Z");
+    for (const asin of ["B00C061AAA", "B00C061BBB"])
+      store.addSugestao({ origemId: o.id, asin, titulo: asin, formato: "CD", formatoOrigem: "Vinil", certeza: "baixa", preco: 50, vendedor: "Amazon", criadoEm: "2026-10-23T00:00:00.000Z" });
+    const sent: string[] = [];
+    const bot = new Bot({ store, send: async (h) => void sent.push(h), collect: async () => ({ ok: false, kind: "http_error", falhasProduto: 1, avisarProduto: false }), resolve: async () => ({ ok: false, motivo: "sem_link" }), now: () => new Date("2026-10-23T00:00:00.000Z") });
+    const [a, b] = store.listSugestoes();
+    await bot.handleCallback(`sga:${a!.id}`);
+    expect(store.getByAsin("B00C061AAA")?.grupoId).toBe(store.getById(o.id)!.grupoId);
+    expect(sent.at(-1)).toContain("cadastrado e agrupado");
+    await bot.handleCallback(`sgr:${b!.id}`);
+    expect(store.asinRecusado("B00C061BBB")).toBe(true);
+    await bot.handleCallback(`sgr:${b!.id}`);
+    expect(sent.at(-1)).toContain("já foi tratada");
+  });
+});

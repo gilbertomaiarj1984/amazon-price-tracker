@@ -66,8 +66,8 @@ textarea{width:100%;resize:vertical;padding:8px}input.val{width:96px;text-align:
 @media(min-width:901px){html,body{height:100%}main{height:100vh;display:flex;flex-direction:column;padding-bottom:12px}.split{flex:1;min-height:0;align-items:stretch;grid-template-rows:minmax(0,1fr)}.det{min-height:0;overflow-y:auto;overscroll-behavior:contain}.esq{display:flex;flex-direction:column;min-height:0;background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:8px}#lst{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:6px 12px 12px 6px}}
 @media(max-width:900px){.split{grid-template-columns:minmax(0,1fr)}}
 </style></head><body><main><header id="topo" class="cd"><div id="saude" class="saude">Carregando…</div>
-<div id="menu"><div class="mb"><button type="button" class="mbtn" data-pn="add" aria-expanded="false" hidden>＋ Rastrear produtos</button><button type="button" class="mbtn" data-pn="grp" aria-expanded="false" hidden>▦ Grupos <b id="ngrp"></b></button><button type="button" class="mbtn" data-pn="fil" aria-expanded="false">⚙ Filtros <b id="nfil"></b></button></div><div id="menuq"></div></div></header>
-<div id="pns"><div class="cd pn" id="pn-add" hidden></div><div class="cd pn" id="pn-grp" hidden></div><div class="cd pn" id="pn-fil" hidden></div></div>
+<div id="menu"><div class="mb"><button type="button" class="mbtn" data-pn="add" aria-expanded="false" hidden>＋ Rastrear produtos</button><button type="button" class="mbtn" data-pn="grp" aria-expanded="false" hidden>▦ Grupos <b id="ngrp"></b></button><button type="button" class="mbtn" data-pn="sug" aria-expanded="false" hidden>✦ Sugestões <b id="nsug"></b></button><button type="button" class="mbtn" data-pn="fil" aria-expanded="false">⚙ Filtros <b id="nfil"></b></button></div><div id="menuq"></div></div></header>
+<div id="pns"><div class="cd pn" id="pn-add" hidden></div><div class="cd pn" id="pn-grp" hidden></div><div class="cd pn" id="pn-sug" hidden></div><div class="cd pn" id="pn-fil" hidden></div></div>
 <div class="split"><div class="esq" id="esq"><div id="lst"></div></div><div class="cd det" id="dir"><div class="vazio">Carregando…</div></div></div></main>
 <script>
 const $=s=>document.querySelector(s);
@@ -160,8 +160,15 @@ function initFiltros(){const el=$('#pn-fil');
  for(const id of ['fq','fmin','fmax'])$('#'+id).oninput=mudou;for(const id of ['fst','fgr','fln','ford'])$('#'+id).onchange=mudou;
  $('#fdir').onclick=e=>{F.dir=F.dir==='desc'?'asc':'desc';e.target.textContent=F.dir==='desc'?'↓ Decrescente':'↑ Crescente';salvaF();renderEsq()};
  $('#flimpa').onclick=()=>{F=Object.assign({},F0);salvaF();initFiltros();renderEsq()}}
+const CERT={alta:'Mesmo formato',media:'Outra variação',baixa:'Outro formato: confira se é o mesmo produto'};
+function renderSug(){const b=document.querySelector('.mbtn[data-pn=sug]'),n=S.sug.length;b.hidden=!n;$('#nsug').textContent=n?'('+n+')':'';if(!n&&S.pn==='sug')setPn(null);
+ let h='<h3>Sugestões: vendido e entregue pela Amazon</h3><p class="mut">Itens sem oferta da Amazon que têm uma variação ou edição vendida por ela. Nada é cadastrado sem você aceitar.</p>';
+ for(const s of S.sug){h+='<div class="row" style="align-items:flex-start;border-top:1px solid var(--bd);padding-top:8px"><div style="flex:1 1 280px;min-width:0"><b>'+esc(s.titulo||s.asin)+'</b><div class="mut">Para o item '+s.origem.num+' ('+esc(s.origem.titulo||s.origem.asin)+')</div><div class="mut">'+esc(s.formato||'')+(s.formatoOrigem?' (o seu: '+esc(s.formatoOrigem)+')':'')+' · '+esc(s.vendedor||'Amazon')+' · <span class="pill'+(s.certeza==='baixa'?' warn':'')+'">'+CERT[s.certeza]+'</span></div></div><b class="preco">'+brl(s.preco)+'</b><div class="act"><a class="btn sm" target="_blank" rel="noopener" href="//www.amazon.com.br/dp/'+s.asin+'">Abrir</a>'+(S.edit?'<button class="btn sm pri" data-sa="'+s.id+'">Aceitar e agrupar</button><button class="btn sm" data-sr="'+s.id+'">Recusar</button>':'')+'</div></div>'}
+ const el=$('#pn-sug');setHtml(el,h);
+ el.querySelectorAll('[data-sa]').forEach(x=>x.onclick=()=>rodar(x,async()=>{aviso('Cadastrando e lendo o item…');const j=await api('POST','/api/sugestoes/'+x.dataset.sa+'/aceitar');aviso(j.leitura?'Item cadastrado e agrupado'+(j.alvoHerdado?' com o alvo do original.':'.'):'Item cadastrado e agrupado; a leitura entra na próxima rodada.');S.ult='';await carregar()}));
+ el.querySelectorAll('[data-sr]').forEach(x=>x.onclick=()=>rodar(x,async()=>{await api('POST','/api/sugestoes/'+x.dataset.sr+'/recusar');aviso('Sugestão recusada. Não volta a aparecer.');await carregar()}))}
 function setHtml(el,h){if(el._h!==h){el.innerHTML=h;el._h=h}}
-function setPn(n){S.pn=n;for(const k of ['add','grp','fil'])$('#pn-'+k).hidden=n!==k;document.querySelectorAll('.mbtn').forEach(b=>b.setAttribute('aria-expanded',String(b.dataset.pn===n)))}
+function setPn(n){S.pn=n;for(const k of ['add','grp','sug','fil'])$('#pn-'+k).hidden=n!==k;document.querySelectorAll('.mbtn').forEach(b=>b.setAttribute('aria-expanded',String(b.dataset.pn===n)))}
 function renderEsq(){let h='',add='',grp='';
  if(S.edit)add+='<div><textarea id="txt" rows="3" maxlength="4000" placeholder="Cole um ou mais links da Amazon (um por linha, até 20)"></textarea><button class="btn pri" id="add">Rastrear</button><div id="res">'+S.ult+'</div>'
   +'<h3 style="font-size:14px;margin:14px 0 4px">Importar do Keepa</h3><div class="mut">Em keepa.com/manage use o botão de exportar (CSV) e escolha o arquivo aqui. Só ASINs; o alvo você define depois.</div><input type="file" id="arq" accept=".csv,.txt,text/csv,text/plain"><div id="imp"></div></div>';
@@ -371,7 +378,7 @@ async function detalhe(){if(S.gsel!=null){try{S.gdet=await get('/api/grupos/'+S.
  try{S.det=await get('/api/itens/'+S.sel+'?dias='+S.dias)}catch(e){S.det=null;S.sel=null}
  renderDir()}
 function selecionar(asin){S.sel=asin;S.gsel=null;S.hover=null;try{history.replaceState(null,'','#'+asin)}catch(e){}renderEsq();detalhe();if(innerWidth<=900)$('#dir').scrollIntoView({behavior:'smooth',block:'start'})}
-async function carregar(){const d=await get('/api/itens');S.itens=d.itens;S.grupos=d.grupos||[];if(S.gsel!=null&&!S.grupos.some(g=>g.id===S.gsel))S.gsel=null;S.edit=!!d.edicao;S.saude=d.saude;
+async function carregar(){const d=await get('/api/itens');S.itens=d.itens;S.grupos=d.grupos||[];S.sug=d.sugestoes||[];renderSug();if(S.gsel!=null&&!S.grupos.some(g=>g.id===S.gsel))S.gsel=null;S.edit=!!d.edicao;S.saude=d.saude;
  if(!S.itens.some(i=>i.asin===S.sel))S.sel=S.itens.length?S.itens[0].asin:null;
  if(F.gr&&F.gr!=='none'&&!S.grupos.some(g=>String(g.id)===F.gr))F.gr='';
  initFiltros();renderSaude();renderEsq();if(!S.pnInit){S.pnInit=1;if(S.edit&&!S.itens.length)setPn('add')}await detalhe()}

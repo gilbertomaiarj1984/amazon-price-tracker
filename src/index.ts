@@ -1,14 +1,16 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { resolveAsin } from "./amazon/asin.ts";
-import { jitterMs } from "./amazon/fetch.ts";
+import { fetchHtml, jitterMs, productUrl } from "./amazon/fetch.ts";
+import { esc, money } from "./format.ts";
 import { Bot } from "./bot.ts";
 import { collectOne, realDeps } from "./collector.ts";
 import { loadConfig } from "./config.ts";
 import { Store } from "./db.ts";
 import { MAX_BODY, panelHandler } from "./panel.ts";
+import { runVarredura, varreduraDevida } from "./sugestoes.ts";
 import { createLock } from "./mutex.ts";
-import { loop, runCycle } from "./scheduler.ts";
+import { loop, msToNextSlot, runCycle } from "./scheduler.ts";
 import { Telegram } from "./telegram.ts";
 import type { Update } from "./telegram.ts";
 import { chatOf } from "./telegram.ts";
@@ -87,8 +89,9 @@ async function poll(): Promise<void> {
 }
 
 const intervalMs = cfg.intervalMin * 60_000;
-const lastCycle = Number(store.getMeta("last_cycle_at") ?? 0);
-const firstDelayMs = Math.max(10_000, intervalMs - (Date.now() - lastCycle));
+// Rodadas em horários fixos (:00 e :30 no padrão), como um cron interno: reiniciar o servidor não dispara coleta.
+const slotDelay = () => msToNextSlot(Date.now(), cfg.intervalMin) + Math.round(Math.random() * 20_000);
+const firstDelayMs = slotDelay();
 
 const cycle = () =>
   runCycle({
@@ -121,6 +124,38 @@ if (cfg.panel) {
   log(`painel em http://${cfg.panel.host}:${cfg.panel.port} (${cfg.panelReadonly ? "somente leitura" : "com ações"})`);
 }
 
+if (cfg.sugestoes) {
+  const sg = cfg.sugestoes;
+  const varredura = async () => {
+    if (!varreduraDevida(store, new Date(), sg.hora)) return;
+    const r = await runVarredura({
+      store,
+      // Cada leitura entra na fila única; a rodada normal intercala entre uma e outra.
+      fetchHtml: (url, opts) => lock(() => fetchHtml(url, opts)),
+      now: () => new Date(),
+      sleep: (ms) => new Promise((res) => setTimeout(res, ms)),
+      pauseMs: () => jitterMs(sg.pausaMinMs, sg.pausaMaxMs),
+      log,
+      maxItens: sg.maxItens,
+      maxCandidatos: sg.maxCandidatos,
+    });
+    if (r.novas > 0) {
+      const pend = store.listSugestoes();
+      await send(`<b>${r.novas} nova(s) sugestão(ões)</b> de item vendido e entregue pela Amazon para itens que ela não vende. ${pend.length} pendente(s)${cfg.panel ? "; também aparecem no painel (Sugestões)" : ""}.`).catch((e) => log(`aviso de sugestões não enviado: ${(e as Error).message}`));
+      for (const s of pend.slice(-3)) {
+        const o = store.getById(s.origemId);
+        const cert = s.certeza === "baixa" ? "\nOutro formato: confira se é o mesmo produto." : "";
+        await send(
+          `<b>${esc(s.titulo ?? s.asin)}</b>\n${money(s.preco)} · ${esc(s.vendedor ?? "Amazon")}${s.formato ? ` · ${esc(s.formato)}` : ""}\nPara o item #${o ? store.numberOf(o.id) : "?"}.${cert}`,
+          [[{ text: "Abrir na Amazon", url: productUrl(s.asin) }], [{ text: "Rastrear", callback_data: `sga:${s.id}` }, { text: "Recusar", callback_data: `sgr:${s.id}` }]],
+        ).catch((e) => log(`sugestão não enviada: ${(e as Error).message}`));
+      }
+    }
+    if (r.parou) await send("A varredura de sugestões parou: a Amazon pediu captcha. Tento de novo amanhã.").catch(() => undefined);
+  };
+  void loop(varredura, { intervalMs: 15 * 60_000, firstDelayMs: 60_000, jitterMs: () => Math.round(Math.random() * 60_000), sleep, signal: ac.signal, log });
+}
+
 const stop = () => {
   log("encerrando");
   ac.abort();
@@ -130,8 +165,8 @@ const stop = () => {
 process.on("SIGTERM", stop);
 process.on("SIGINT", stop);
 
-log(`iniciado: ${store.list().length} itens, rodada a cada ${cfg.intervalMin} min, primeira em ${Math.round(firstDelayMs / 1000)} s`);
+log(`iniciado: ${store.list().length} itens, rodada a cada ${cfg.intervalMin} min em horário fixo, primeira em ${Math.round(firstDelayMs / 1000)} s`);
 await send(`<b>Rastreador no ar.</b> ${store.list().length} itens, rodada a cada ${cfg.intervalMin} min. Use <code>/ajuda</code>.`).catch((e) => log(`aviso de início não enviado: ${(e as Error).message}`));
 
-void loop(cycle, { intervalMs, firstDelayMs, jitterMs: () => Math.round(Math.random() * 60_000), sleep, signal: ac.signal, log });
+void loop(cycle, { intervalMs, firstDelayMs, nextDelayMs: slotDelay, jitterMs: () => 0, sleep, signal: ac.signal, log });
 await poll();
