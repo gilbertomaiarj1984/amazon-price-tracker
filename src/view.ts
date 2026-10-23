@@ -14,7 +14,6 @@ export interface LineView {
   max: number | null;
   variacao: number | null;
   coletas: number;
-  alvo: number | null;
   /** Só na linha Terceiros: a Amazon não vende, e este é o melhor terceiro novo (aparece mesmo com a linha desligada). */
   automatico?: { envio: "amazon" | "terceiro" | null };
 }
@@ -25,6 +24,11 @@ export interface ProductView {
   asin: string;
   pausado: boolean;
   linhas: Record<LineKey, LineView>;
+  /** Alvo único do item, válido para qualquer fonte. */
+  alvo: number | null;
+  /** Menor preço agora entre as fontes com oferta (Amazon, Terceiros, Usado). */
+  menor: number | null;
+  menorLinha: LineKey | null;
 }
 
 export function buildView(store: Store, p: Product, now: Date): ProductView {
@@ -45,7 +49,6 @@ export function buildView(store: Store, p: Product, now: Date): ProductView {
       max: st.max,
       variacao: st.coletas > 1 && st.primeiro && atual != null ? ((atual - st.primeiro) / st.primeiro) * 100 : null,
       coletas: st.coletas,
-      alvo: store.getAlvo(p.id, linha),
     };
     linhas[linha] = view;
     const fb = linha === "terceiros" ? store.getFallback(p.id) : null;
@@ -56,5 +59,11 @@ export function buildView(store: Store, p: Product, now: Date): ProductView {
       Object.assign(view, extra);
     }
   }
-  return { num: store.numberOf(p.id), titulo: p.titulo, asin: p.asin, pausado: p.pausado, linhas };
+  let menor: number | null = null;
+  let menorLinha: LineKey | null = null;
+  for (const linha of LINE_KEYS) {
+    const a = linhas[linha].atual;
+    if (a != null && (menor == null || a < menor)) ((menor = a), (menorLinha = linha));
+  }
+  return { num: store.numberOf(p.id), titulo: p.titulo, asin: p.asin, pausado: p.pausado, linhas, alvo: store.getAlvo(p.id), menor, menorLinha };
 }

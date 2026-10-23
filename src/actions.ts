@@ -1,7 +1,7 @@
 import type { AsinResult } from "./amazon/asin.ts";
 import type { CollectOutcome } from "./collector.ts";
 import type { Product, Store } from "./db.ts";
-import type { LineKey } from "./types.ts";
+import { buildView } from "./view.ts";
 
 /** Operações de domínio compartilhadas pelo bot do Telegram e pelo painel web. Nada aqui formata texto para um canal. */
 export interface ActionDeps {
@@ -55,7 +55,10 @@ export type AddResult =
   | { ok: false; erro: "existente"; product: Product }
   | { ok: false; erro: "leitura"; asin: string; detalhe: string | null };
 
-export type AlvoResult = { ok: true; atual: number | null; dentro: boolean } | { ok: false; erro: "linha_desligada" };
+export interface AlvoResult {
+  atual: number | null;
+  dentro: boolean;
+}
 
 export type AceiteResult =
   | { ok: true; product: Product; grupoId: number; alvoHerdado: number | null; leitura: boolean }
@@ -91,15 +94,11 @@ export class Actions {
     return { ok: true, product: this.store.getById(p.id)! };
   }
 
-  /** Alvo de uma linha (null apaga). Recusa linha desligada. */
-  setAlvo(p: Product, linha: LineKey, v: number | null): AlvoResult {
-    if (v != null && linha !== "amazon" && !(linha === "terceiros" ? p.terceirosOn : p.usadoOn)) return { ok: false, erro: "linha_desligada" };
-    this.store.setAlvo(p.id, linha, v);
-    const last = this.store.lastPoint(p.id, linha);
-    const disp = this.store.getAlertState(p.id, linha).disponivel;
-    const fb = linha === "amazon" ? this.store.getFallback(p.id) : null;
-    const atual = last && disp !== false ? last.preco : (fb?.preco ?? null);
-    return { ok: true, atual, dentro: v != null && atual != null && atual <= v };
+  /** Alvo único do item (null apaga): vale para qualquer fonte, comparado com o menor preço. */
+  setAlvo(p: Product, v: number | null): AlvoResult {
+    this.store.setAlvo(p.id, v);
+    const atual = buildView(this.store, p, this.d.now()).menor;
+    return { atual, dentro: v != null && atual != null && atual <= v };
   }
 
   /** Inverte a pausa, ou fixa o valor dado. Devolve o novo estado. */
@@ -163,8 +162,8 @@ export class Actions {
       if (gid != null) this.store.setGrupo(origem.id, gid);
     }
     if (gid != null) this.store.setGrupo(p.id, gid);
-    const alvo = this.store.getAlvo(origem.id, "amazon");
-    if (alvo != null) this.store.setAlvo(p.id, "amazon", alvo);
+    const alvo = this.store.getAlvo(origem.id);
+    if (alvo != null) this.store.setAlvo(p.id, alvo);
     this.store.setSugestaoStatus(id, "aceita", now);
     const lida = await this.collectNow(p);
     return { ok: true, product: this.store.getById(p.id)!, grupoId: gid ?? 0, alvoHerdado: alvo, leitura: lida.ok };

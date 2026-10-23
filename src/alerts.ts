@@ -18,7 +18,6 @@ export interface EvaluateInput {
   linha: LineKey;
   /** null = sem oferta neste ciclo */
   preco: number | null;
-  alvo: number | null;
   /** Menor preço do histórico ANTES deste ciclo. null = sem histórico. */
   minimoAnterior: number | null;
   avisarNovoMinimo: boolean;
@@ -38,22 +37,37 @@ export function evaluate(i: EvaluateInput): { eventos: AlertEvent[]; next: Alert
   next.disponivel = true;
 
   const novoMinimo = i.minimoAnterior != null && preco < i.minimoAnterior;
-  let alertouAlvo = false;
-  if (i.alvo != null) {
-    if (preco <= i.alvo) {
-      if (i.prev.ultimoAlertado == null || preco < i.prev.ultimoAlertado) {
-        eventos.push({ tipo: "alvo", linha: i.linha, preco, alvo: i.alvo, minimo: i.minimoAnterior, novoMinimo });
-        next.ultimoAlertado = preco;
-        alertouAlvo = true;
-      }
-    } else {
-      next.ultimoAlertado = null;
-    }
-  }
-  if (i.avisarNovoMinimo && novoMinimo && !alertouAlvo && i.minimoAnterior != null) {
+  if (i.avisarNovoMinimo && novoMinimo && i.minimoAnterior != null) {
     eventos.push({ tipo: "novo_minimo", linha: i.linha, preco, minimoAnterior: i.minimoAnterior });
   }
   return { eventos, next };
+}
+
+export interface Candidato {
+  linha: LineKey;
+  preco: number;
+  minimoAnterior: number | null;
+}
+
+/**
+ * Alvo único do item: vale para a menor oferta entre as fontes. Avisa ao entrar na faixa e depois só se o preço baixar
+ * mais; sair da faixa rearma. `ultimoAlertado` fica no estado da linha Amazon. Sem oferta em nenhuma fonte, nada muda.
+ */
+export function evaluateAlvo(i: {
+  candidatos: Candidato[];
+  alvo: number | null;
+  ultimoAlertado: number | null;
+}): { evento: Extract<AlertEvent, { tipo: "alvo" }> | null; ultimoAlertado: number | null } {
+  let melhor: Candidato | null = null;
+  for (const c of i.candidatos) if (!melhor || c.preco < melhor.preco) melhor = c;
+  if (i.alvo == null || !melhor) return { evento: null, ultimoAlertado: i.ultimoAlertado };
+  if (melhor.preco > i.alvo) return { evento: null, ultimoAlertado: null };
+  if (i.ultimoAlertado != null && melhor.preco >= i.ultimoAlertado) return { evento: null, ultimoAlertado: i.ultimoAlertado };
+  const novoMinimo = melhor.minimoAnterior != null && melhor.preco < melhor.minimoAnterior;
+  return {
+    evento: { tipo: "alvo", linha: melhor.linha, preco: melhor.preco, alvo: i.alvo, minimo: melhor.minimoAnterior, novoMinimo },
+    ultimoAlertado: melhor.preco,
+  };
 }
 
 export const FAILURE_THRESHOLD = 3;
