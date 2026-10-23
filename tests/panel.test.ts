@@ -472,3 +472,15 @@ test("topo do painel mostra o número do último PR e não tem título", async (
   expect(html).toContain(`PR #${ULTIMO_PR}`);
   expect(html).not.toContain("<h1>");
 });
+
+test("arrastar rola a lista da esquerda (e a página) perto das bordas", async () => {
+  const html = await (await get("/")).text();
+  const js = html.split("<script>")[1]!.split("</script>")[0]!;
+  expect(() => new Function(js)).not.toThrow();
+  expect(js).toContain("function autoRolar");
+  expect(js).toContain("document.addEventListener('dragover'");
+  expect(js).toMatch(/for\(const el of \[\$\('#lst'\)\]\)[^]*el\.scrollTop\+=v/);
+  expect(js).toContain("scrollBy(0,v)");
+  expect(js).toContain("autoRolar(true)");
+  expect(js).toContain("autoRolar(false)");
+});
