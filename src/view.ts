@@ -15,8 +15,8 @@ export interface LineView {
   variacao: number | null;
   coletas: number;
   alvo: number | null;
-  /** Só na linha Amazon: ela não vende, e `atual`/`vendedor` são do melhor terceiro (novo). */
-  terceiro?: { envio: "amazon" | "terceiro" | null };
+  /** Só na linha Terceiros: a Amazon não vende, e este é o melhor terceiro novo (aparece mesmo com a linha desligada). */
+  automatico?: { envio: "amazon" | "terceiro" | null };
 }
 
 export interface ProductView {
@@ -48,10 +48,12 @@ export function buildView(store: Store, p: Product, now: Date): ProductView {
       alvo: store.getAlvo(p.id, linha),
     };
     linhas[linha] = view;
-    const fb = linha === "amazon" && ligada && atual == null ? store.getFallback(p.id) : null;
+    const fb = linha === "terceiros" ? store.getFallback(p.id) : null;
     if (fb) {
-      // O preço exibido passa a ser o do terceiro; a variação da série Amazon não vale para ele.
-      Object.assign(view, { atual: fb.preco, vendedor: fb.vendedor, variacao: null, terceiro: { envio: fb.envio } });
+      // A Amazon não vende: o melhor terceiro fica na linha Terceiros, sem tocar na linha Amazon.
+      const extra: Partial<LineView> = { automatico: { envio: fb.envio } };
+      if (!ligada) Object.assign(extra, { atual: fb.preco, vendedor: fb.vendedor });
+      Object.assign(view, extra);
     }
   }
   return { num: store.numberOf(p.id), titulo: p.titulo, asin: p.asin, pausado: p.pausado, linhas };
