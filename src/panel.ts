@@ -148,6 +148,18 @@ export interface Selo {
   coletas: number;
   veredito: Veredito;
   atualizadoEm: string | null;
+  /** Pontos dos últimos 30 dias para o gráfico do userscript (no máximo SERIE_MAX). */
+  serie: Array<{ t: string; v: number }>;
+}
+
+const SERIE_MAX = 120;
+
+/** Reduz a série a no máximo `max` pontos, mantendo o primeiro e o último. */
+export function downsample<T>(rows: T[], max: number): T[] {
+  if (rows.length <= max) return rows;
+  const out: T[] = [];
+  for (let i = 0; i < max; i++) out.push(rows[Math.round((i * (rows.length - 1)) / (max - 1))]!);
+  return out;
 }
 
 /** Dados mínimos para o selo do userscript: nada de ofertas, vendedores, alvos ou configuração. */
@@ -164,7 +176,10 @@ export function panelSelo(store: Store, p: Product, now: Date): Selo {
   if (l.atual != null && l.min != null && media != null && l.coletas >= 3) {
     veredito = l.atual <= l.min * 1.02 ? "minimo" : l.atual <= media ? "bom" : "acima";
   }
-  return { rastreado: true, linha, atual: l.atual, min: l.min, max: l.max, media, coletas: l.coletas, veredito, atualizadoEm: avg.t };
+  const rows = store.db
+    .query("SELECT coletado_em AS t, preco AS v FROM price_lines WHERE product_id = ? AND linha = ? AND coletado_em >= ? ORDER BY coletado_em")
+    .all(p.id, linha, desde) as Array<{ t: string; v: number }>;
+  return { rastreado: true, linha, atual: l.atual, min: l.min, max: l.max, media, coletas: l.coletas, veredito, atualizadoEm: avg.t, serie: downsample(rows, SERIE_MAX) };
 }
 
 function tokenOk(given: string | null, expected: string): boolean {
