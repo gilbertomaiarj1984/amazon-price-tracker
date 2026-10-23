@@ -10,7 +10,37 @@ const core = require(path) as {
   isSearchPath: (p: string) => boolean;
   uniqueAsins: (l: string[]) => string[];
   MAX: number;
+  alvoStatus: (a: number | null, b: number | null) => { k: string; cor: string; texto: string } | null;
+  parseValor: (s: string) => number | null;
+  quando: (iso: string | null, agora: number) => string;
 };
+
+describe("userscript: alvo e detalhes", () => {
+  test("status do alvo com as mesmas faixas do painel", () => {
+    expect(core.alvoStatus(100, null)).toBeNull();
+    expect(core.alvoStatus(null, 100)).toBeNull();
+    expect(core.alvoStatus(90, 100)?.k).toBe("dentro");
+    expect(core.alvoStatus(100, 100)?.texto).toBe("No alvo");
+    expect(core.alvoStatus(110, 100)).toMatchObject({ k: "perto", texto: "▲ 10,0% acima do alvo" });
+    expect(core.alvoStatus(120, 100)?.k).toBe("perto");
+    expect(core.alvoStatus(121, 100)?.k).toBe("longe");
+  });
+  test("valor digitado", () => {
+    expect(core.parseValor("449,90")).toBe(449.9);
+    expect(core.parseValor("1.299,90")).toBe(1299.9);
+    expect(core.parseValor("R$ 199")).toBe(199);
+    expect(core.parseValor("449.90")).toBe(449.9);
+    for (const x of ["", "abc", "0", "-5", "2000000"]) expect(core.parseValor(x)).toBeNull();
+  });
+  test("há quanto tempo", () => {
+    const now = Date.parse("2026-10-23T15:00:00Z");
+    expect(core.quando("2026-10-23T14:59:40Z", now)).toBe("agora");
+    expect(core.quando("2026-10-23T14:30:00Z", now)).toBe("há 30 min");
+    expect(core.quando("2026-10-23T12:00:00Z", now)).toBe("há 3 h");
+    expect(core.quando("2026-10-21T15:00:00Z", now)).toBe("há 2 dias");
+    expect(core.quando(null, now)).toBe("");
+  });
+});
 
 describe("userscript", () => {
   test("extrai o ASIN dos formatos de URL e concorda com o bot", () => {

@@ -8,6 +8,7 @@ import { parseUserNumber } from "./numbers.ts";
 import { PANEL_HTML } from "./panel-page.ts";
 import { DAY_MS, buildView } from "./view.ts";
 import { timingSafeEqual } from "node:crypto";
+import { userscriptHandler } from "./userscript-api.ts";
 import { LINE_KEYS } from "./types.ts";
 import type { LineKey } from "./types.ts";
 
@@ -262,6 +263,8 @@ function tokenOk(given: string | null, expected: string): boolean {
 export interface PanelDeps extends Partial<Pick<ActionDeps, "collect" | "resolve">> {
   /** Token do endpoint /api/selo; sem ele a rota responde 404. */
   token?: string | null;
+  /** Token da API do userscript (/api/us/*, com escrita); sem ele a rota responde 404. */
+  usToken?: string | null;
   store: Store;
   now: () => Date;
   intervalMin: number;
@@ -524,7 +527,13 @@ export function panelHandler(d: PanelDeps): (req: Request) => Promise<Response> 
     }
   };
 
+  const us = userscriptHandler(d, act);
   return async (req) => {
+    if (new URL(req.url).pathname.startsWith("/api/us/")) {
+      const res = await us(req).catch(() => json({ erro: "erro interno" }, 500));
+      for (const [k, v] of Object.entries(SECURITY)) res.headers.set(k, v);
+      return res;
+    }
     const res = req.method === "GET" || req.method === "HEAD" ? read(req) : await write(req).catch(() => json({ erro: "erro interno" }, 500));
     for (const [k, v] of Object.entries(SECURITY)) res.headers.set(k, v);
     return res;
