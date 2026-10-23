@@ -72,7 +72,7 @@ Ele faz ~50 requisições espaçadas (2 a 5 s), imprime a taxa de sucesso por ti
 
 ## Isolamento
 
-O app roda sozinho e não toca em nenhum outro projeto do mesmo servidor: diretório, projeto Compose, rede, volume, bot do Telegram e secrets próprios, sem portas publicadas e sem depender de Caddy, Postgres ou do Docker socket. Detalhes em `CLAUDE.md`.
+O app roda sozinho e não toca em nenhum outro projeto do mesmo servidor: diretório, projeto Compose, rede, volume, bot do Telegram e secrets próprios, sem portas publicadas (o painel web é exposto só pelo Caddy do servidor, com login, via rede `proxy`; veja `docs/painel.md`) e sem depender de Postgres ou do Docker socket. Detalhes em `CLAUDE.md`.
 
 ## Aviso
 
