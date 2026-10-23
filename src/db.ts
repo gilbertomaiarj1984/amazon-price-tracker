@@ -53,6 +53,21 @@ CREATE TABLE IF NOT EXISTS grupos (
   nome TEXT NOT NULL UNIQUE COLLATE NOCASE,
   criado_em TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS sugestoes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  origem_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  asin TEXT NOT NULL,
+  titulo TEXT,
+  formato TEXT,
+  formato_origem TEXT,
+  certeza TEXT NOT NULL,
+  preco REAL NOT NULL,
+  vendedor TEXT,
+  status TEXT NOT NULL DEFAULT 'pendente',
+  criado_em TEXT NOT NULL,
+  decidido_em TEXT,
+  UNIQUE (origem_id, asin)
+);
 CREATE TABLE IF NOT EXISTS meta (
   key TEXT PRIMARY KEY,
   value TEXT
@@ -88,6 +103,58 @@ export interface Grupo {
   nome: string;
   criadoEm: string;
 }
+
+export type SugestaoStatus = "pendente" | "aceita" | "recusada" | "obsoleta";
+/** alta: mesmo rótulo de formato; media: outra variação (cor, tamanho, edição); baixa: outro formato (ex.: vinil x CD). */
+export type Certeza = "alta" | "media" | "baixa";
+
+export interface Sugestao {
+  id: number;
+  origemId: number;
+  asin: string;
+  titulo: string | null;
+  formato: string | null;
+  formatoOrigem: string | null;
+  certeza: Certeza;
+  /** Preço da Amazon no momento da varredura. */
+  preco: number;
+  vendedor: string | null;
+  status: SugestaoStatus;
+  criadoEm: string;
+  decididoEm: string | null;
+}
+
+interface SugestaoRow {
+  id: number;
+  origem_id: number;
+  asin: string;
+  titulo: string | null;
+  formato: string | null;
+  formato_origem: string | null;
+  certeza: Certeza;
+  preco: number;
+  vendedor: string | null;
+  status: SugestaoStatus;
+  criado_em: string;
+  decidido_em: string | null;
+}
+
+const toSugestao = (r: SugestaoRow): Sugestao => ({
+  id: r.id,
+  origemId: r.origem_id,
+  asin: r.asin,
+  titulo: r.titulo,
+  formato: r.formato,
+  formatoOrigem: r.formato_origem,
+  certeza: r.certeza,
+  preco: r.preco,
+  vendedor: r.vendedor,
+  status: r.status,
+  criadoEm: r.criado_em,
+  decididoEm: r.decidido_em,
+});
+
+export type NovaSugestao = Omit<Sugestao, "id" | "status" | "decididoEm">;
 
 export interface LineStats {
   atual: number | null;
@@ -352,6 +419,50 @@ export class Store {
     } catch {
       return null;
     }
+  }
+
+  /** false se esse ASIN já foi sugerido para o mesmo item (em qualquer estado). */
+  addSugestao(n: NovaSugestao): boolean {
+    const r = this.db
+      .query(
+        "INSERT OR IGNORE INTO sugestoes (origem_id, asin, titulo, formato, formato_origem, certeza, preco, vendedor, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      )
+      .run(n.origemId, n.asin, n.titulo, n.formato, n.formatoOrigem, n.certeza, n.preco, n.vendedor, n.criadoEm);
+    return r.changes > 0;
+  }
+
+  getSugestao(id: number): Sugestao | null {
+    const r = this.db.query("SELECT * FROM sugestoes WHERE id = ?").get(id) as SugestaoRow | null;
+    return r ? toSugestao(r) : null;
+  }
+
+  listSugestoes(status: SugestaoStatus = "pendente"): Sugestao[] {
+    return (this.db.query("SELECT * FROM sugestoes WHERE status = ? ORDER BY id").all(status) as SugestaoRow[]).map(toSugestao);
+  }
+
+  /** Quem o usuário recusou não volta a ser sugerido, para nenhum item. */
+  asinRecusado(asin: string): boolean {
+    return this.db.query("SELECT 1 FROM sugestoes WHERE asin = ? AND status = 'recusada' LIMIT 1").get(asin) != null;
+  }
+
+  jaSugerido(origemId: number, asin: string): boolean {
+    return this.db.query("SELECT 1 FROM sugestoes WHERE origem_id = ? AND asin = ?").get(origemId, asin) != null;
+  }
+
+  setSugestaoStatus(id: number, status: Exclude<SugestaoStatus, "pendente">, now: string): void {
+    this.db.query("UPDATE sugestoes SET status = ?, decidido_em = ? WHERE id = ? AND status = 'pendente'").run(status, now, id);
+  }
+
+  /** Sugestões pendentes de itens em que a Amazon voltou a vender, ou que já estão rastreados: perdem o sentido. */
+  descartarObsoletas(now: string): number {
+    const r = this.db
+      .query(
+        `UPDATE sugestoes SET status = 'obsoleta', decidido_em = ? WHERE status = 'pendente' AND (
+           asin IN (SELECT asin FROM products)
+           OR origem_id IN (SELECT product_id FROM alert_state WHERE linha = 'amazon' AND disponivel = 1))`,
+      )
+      .run(now);
+    return r.changes;
   }
 
   getMeta(key: string): string | null {

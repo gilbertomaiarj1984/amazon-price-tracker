@@ -1,12 +1,13 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { resolveAsin } from "./amazon/asin.ts";
-import { jitterMs } from "./amazon/fetch.ts";
+import { fetchHtml, jitterMs } from "./amazon/fetch.ts";
 import { Bot } from "./bot.ts";
 import { collectOne, realDeps } from "./collector.ts";
 import { loadConfig } from "./config.ts";
 import { Store } from "./db.ts";
 import { MAX_BODY, panelHandler } from "./panel.ts";
+import { runVarredura, varreduraDevida } from "./sugestoes.ts";
 import { createLock } from "./mutex.ts";
 import { loop, runCycle } from "./scheduler.ts";
 import { Telegram } from "./telegram.ts";
@@ -119,6 +120,30 @@ if (cfg.panel) {
     }),
   });
   log(`painel em http://${cfg.panel.host}:${cfg.panel.port} (${cfg.panelReadonly ? "somente leitura" : "com ações"})`);
+}
+
+if (cfg.sugestoes) {
+  const sg = cfg.sugestoes;
+  const varredura = async () => {
+    if (!varreduraDevida(store, new Date(), sg.hora)) return;
+    const r = await runVarredura({
+      store,
+      // Cada leitura entra na fila única; a rodada normal intercala entre uma e outra.
+      fetchHtml: (url, opts) => lock(() => fetchHtml(url, opts)),
+      now: () => new Date(),
+      sleep: (ms) => new Promise((res) => setTimeout(res, ms)),
+      pauseMs: () => jitterMs(sg.pausaMinMs, sg.pausaMaxMs),
+      log,
+      maxItens: sg.maxItens,
+      maxCandidatos: sg.maxCandidatos,
+    });
+    if (r.novas > 0) {
+      const n = store.listSugestoes().length;
+      await send(`<b>${r.novas} nova(s) sugestão(ões)</b> de item vendido pela Amazon para itens que ela não vende. ${n} pendente(s) para revisar${cfg.panel ? " no painel (aba Sugestões)" : ""}.`).catch((e) => log(`aviso de sugestões não enviado: ${(e as Error).message}`));
+    }
+    if (r.parou) await send("A varredura de sugestões parou: a Amazon pediu captcha. Tento de novo amanhã.").catch(() => undefined);
+  };
+  void loop(varredura, { intervalMs: 15 * 60_000, firstDelayMs: 60_000, jitterMs: () => Math.round(Math.random() * 60_000), sleep, signal: ac.signal, log });
 }
 
 const stop = () => {

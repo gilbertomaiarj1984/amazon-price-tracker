@@ -57,6 +57,12 @@ export type AddResult =
 
 export type AlvoResult = { ok: true; atual: number | null; dentro: boolean } | { ok: false; erro: "linha_desligada" };
 
+export type AceiteResult =
+  | { ok: true; product: Product; grupoId: number; alvoHerdado: number | null; leitura: boolean }
+  | { ok: false; erro: "nao_pendente" | "existente" | "origem_removida" };
+
+const NOME_GRUPO_MAX = 60;
+
 export class Actions {
   constructor(private readonly d: ActionDeps) {}
 
@@ -128,6 +134,41 @@ export class Actions {
     this.store.setMeta(consultaKey(p.id), now.toISOString());
     const r = await this.collectNow(p);
     return r.ok ? { ok: true } : { ok: false, erro: "leitura", detalhe: r.detalhe };
+  }
+
+  /**
+   * Aceita uma sugestão: cadastra o item, agrupa com o original (criando o grupo se preciso) e herda o alvo da Amazon.
+   * A leitura inicial é de melhor esforço: se falhar, o item fica cadastrado e entra na próxima rodada.
+   */
+  async aceitarSugestao(id: number): Promise<AceiteResult> {
+    const s = this.store.getSugestao(id);
+    if (!s || s.status !== "pendente") return { ok: false, erro: "nao_pendente" };
+    if (this.store.getByAsin(s.asin)) return { ok: false, erro: "existente" };
+    const origem = this.store.getById(s.origemId);
+    if (!origem) return { ok: false, erro: "origem_removida" };
+    const now = this.d.now().toISOString();
+    const p = this.store.addProduct(s.asin, s.titulo, now);
+    let gid = origem.grupoId;
+    if (gid == null) {
+      const base = (origem.titulo ?? origem.asin).replace(/\s+/g, " ").trim().slice(0, NOME_GRUPO_MAX);
+      const g = this.store.addGrupo(base, now) ?? this.store.addGrupo(`${base.slice(0, 48)} (${origem.asin})`, now);
+      gid = g?.id ?? null;
+      if (gid != null) this.store.setGrupo(origem.id, gid);
+    }
+    if (gid != null) this.store.setGrupo(p.id, gid);
+    const alvo = this.store.getAlvo(origem.id, "amazon");
+    if (alvo != null) this.store.setAlvo(p.id, "amazon", alvo);
+    this.store.setSugestaoStatus(id, "aceita", now);
+    const lida = await this.collectNow(p);
+    return { ok: true, product: this.store.getById(p.id)!, grupoId: gid ?? 0, alvoHerdado: alvo, leitura: lida.ok };
+  }
+
+  /** Recusa: o ASIN não volta a ser sugerido para nenhum item. */
+  recusarSugestao(id: number): boolean {
+    const s = this.store.getSugestao(id);
+    if (!s || s.status !== "pendente") return false;
+    this.store.setSugestaoStatus(id, "recusada", this.d.now().toISOString());
+    return true;
   }
 
   /** Lê o item agora, depois de ligar uma linha. */
