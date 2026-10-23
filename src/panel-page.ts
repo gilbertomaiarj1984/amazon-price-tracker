@@ -77,10 +77,15 @@ function aviso(t,bad){let e=$('#aviso');if(!e){e=document.createElement('div');e
 async function rodar(btn,fn){if(btn)btn.disabled=true;try{await fn()}catch(e){aviso(e.message,1)}finally{if(btn)btn.disabled=false}}
 const hashAsin=()=>{const h=location.hash.slice(1);return /^[A-Z0-9]{10}$/.test(h)?h:null};
 const S={itens:[],grupos:[],gsel:null,gdet:null,edit:false,sel:hashAsin(),dias:14,visao:'grafico',det:null,ult:'',saude:null,hover:null};
+const MOTIVOS={captcha:'captcha da Amazon',http_503:'Amazon respondeu 503',http_error:'erro HTTP',vazio:'página vazia',html_inesperado:'página em formato inesperado',erro_rede:'falha de rede'};
+const motivo=m=>MOTIVOS[m]||m||'motivo desconhecido';
+/* nunca = ainda sem leitura; erro = leitura falhou e nada foi gravado; ok = leu (a Amazon pode não ter oferta) */
+const lido=i=>i.linhas.amazon.coletas||(i.ultimaColeta&&i.ultimaColeta.ok)?'ok':i.ultimaColeta?'erro':'nunca';
 function status(i){const a=i.linhas.amazon;
  if(i.pausado)return{k:'paused',t:'Pausado'};
- if(!a.coletas)return{k:'',t:'Aguardando 1ª coleta'};
- if(a.atual==null)return{k:'gap',t:'Amazon sem oferta'};
+ if(!a.coletas&&!i.ultimaColeta)return{k:'',t:'Aguardando 1ª coleta'};
+ if(!a.coletas&&!i.ultimaColeta.ok)return{k:'gap',t:'Erro na coleta ('+motivo(i.ultimaColeta.motivo)+')'};
+ if(a.atual==null)return{k:'gap',t:'Amazon sem oferta (confirmado)'};
  if(a.alvo==null)return{k:'',t:'Sem alvo'};
  if(a.atual<=a.alvo)return{k:'below',t:'▼ Dentro do alvo'};
  const p=(a.atual-a.alvo)/a.alvo*100;return{k:p>LIMITE_LARANJA?'hot':'warn',t:'▲ '+p.toFixed(1).replace('.',',')+'% acima do alvo'}}
@@ -118,8 +123,8 @@ function passa(i){const a=i.linhas.amazon,t=sem(i.titulo)+' '+i.asin.toLowerCase
  switch(F.st){case 'dentro':if(!(a.atual!=null&&a.alvo!=null&&a.atual<=a.alvo))return false;break;
   case 'acima':if(!(a.atual!=null&&a.alvo!=null&&a.atual>a.alvo))return false;break;
   case 'semalvo':if(a.alvo!=null)return false;break;case 'pausado':if(!i.pausado)return false;break;
-  case 'falha':if(!(i.falhasSeguidas>0))return false;break;case 'semoferta':if(!(a.coletas&&a.atual==null))return false;break;
-  case 'semcoleta':if(a.coletas)return false;break}
+  case 'falha':if(!(i.falhasSeguidas>0))return false;break;case 'semoferta':if(!(lido(i)==='ok'&&a.atual==null))return false;break;
+  case 'semcoleta':if(lido(i)==='ok')return false;break}
  if(F.gr==='none'?i.grupoId!=null:F.gr&&String(i.grupoId)!==F.gr)return false;
  if(F.ln&&!i.linhas[F.ln].ligada)return false;
  const p=F.ln?i.linhas[F.ln].atual:preco(i),mn=nv(F.min),mx=nv(F.max);
@@ -246,7 +251,7 @@ function renderDir(){if(S.gsel!=null)return renderGrupo();const d=S.det,it=S.ite
  h+='<div class="tw"><table><tr><th>Linha de preço</th><th class="n">Agora</th><th class="n">Alvo</th><th class="n">Mín 30 d</th><th class="n">Máx 30 d</th><th class="n">Variação</th>'+(S.edit?'<th>Coleta</th>':'')+'</tr>';
  LK.forEach((k,idx)=>{const l=L[k],on=l.ligada;
   h+='<tr data-k="'+k+'"><td><i class="key" style="--c:'+COR[k]+'"></i><b style="font-weight:600">'+NOME[k]+'</b>'+(idx===0?' <span class="pill">principal</span>':'')+'</td>'
-   +'<td class="n num">'+(on?(l.atual!=null?brl(l.atual):'<span class="mut">sem oferta</span>'):'<span class="mut">—</span>')+'</td>'
+   +'<td class="n num">'+(on?(l.atual!=null?brl(l.atual):idx===0&&lido(it)==='nunca'?'<span class="mut">aguardando</span>':idx===0&&lido(it)==='erro'?'<span class="mut">erro na coleta</span>':'<span class="mut">sem oferta</span>'):'<span class="mut">—</span>')+'</td>'
    +'<td class="n">'+(S.edit?'<input type="text" class="val" inputmode="decimal" data-alvo="'+k+'" value="'+(l.alvo!=null?String(l.alvo).replace('.',','):'')+'" placeholder="sem alvo" aria-label="Alvo da linha '+NOME[k]+'"'+(on?'':' disabled')+'>':(l.alvo!=null?brl(l.alvo):'—'))+'</td>'
    +'<td class="n num">'+(on?brl(l.min):'—')+'</td><td class="n num">'+(on?brl(l.max):'—')+'</td><td class="n num">'+(on&&l.variacao!=null?pct(l.variacao):'—')+'</td>'
    +(S.edit?'<td>'+(idx===0?'<span class="mut">sempre</span>':'<label><input type="checkbox" data-linha="'+k+'" '+(on?'checked':'')+'> coletar</label>')+'</td>':'')+'</tr>'});
@@ -256,7 +261,7 @@ function renderDir(){if(S.gsel!=null)return renderGrupo();const d=S.det,it=S.ite
  else h+=tabelaColetas(d);
  h+='<div class="sh">Ofertas na última coleta <span class="mut">'+(d.ofertasEm?ago(d.ofertasEm):'')+'</span></div>';
  const best=melhores(d.ofertas);
- h+=d.ofertas.length?'<div class="tw"><table><tr><th>Vendedor</th><th>Condição</th><th>Envio</th><th class="n">Preço</th><th class="n">Frete</th><th class="n">Total</th></tr>'+d.ofertas.map(o=>{const tot=o.preco+(o.frete||0),menor=!o.descartada&&best[o.condicao]===tot;return '<tr class="'+(o.descartada?'desc':menor?'best':'')+'"><td>'+esc(o.vendedor)+(o.descartada?' <span class="pill fail" style="text-decoration:none">descartada (suspeita)</span>':'')+(menor?' <span class="pill below">menor</span>':'')+'</td><td>'+esc(o.condicao)+'</td><td>'+esc(o.envio)+'</td><td class="n num">'+brl(o.preco)+'</td><td class="n num">'+(o.frete==null?'—':o.frete?brl(o.frete):'grátis')+'</td><td class="n num">'+brl(tot)+'</td></tr>'}).join('')+'</table></div>':'<p class="mut">Sem ofertas registradas.</p>';
+ h+=d.ofertas.length?'<div class="tw"><table><tr><th>Vendedor</th><th>Condição</th><th>Envio</th><th class="n">Preço</th><th class="n">Frete</th><th class="n">Total</th></tr>'+d.ofertas.map(o=>{const tot=o.preco+(o.frete||0),menor=!o.descartada&&best[o.condicao]===tot;return '<tr class="'+(o.descartada?'desc':menor?'best':'')+'"><td>'+esc(o.vendedor)+(o.descartada?' <span class="pill fail" style="text-decoration:none">descartada (suspeita)</span>':'')+(menor?' <span class="pill below">menor</span>':'')+'</td><td>'+esc(o.condicao)+'</td><td>'+esc(o.envio)+'</td><td class="n num">'+brl(o.preco)+'</td><td class="n num">'+(o.frete==null?'—':o.frete?brl(o.frete):'grátis')+'</td><td class="n num">'+brl(tot)+'</td></tr>'}).join('')+'</table></div>':'<p class="mut">'+(lido(it)==='nunca'?'Ainda sem leitura desta página.':lido(it)==='erro'?'A última leitura falhou ('+esc(motivo(it.ultimaColeta.motivo))+'), então não há ofertas registradas. Tente Consultar agora.':'Lido sem nenhuma oferta (nem Amazon, nem outros vendedores ligados).')+'</p>';
  $('#dir').innerHTML=h;
  const dir=$('#dir'),A='/api/itens/'+d.asin,re=()=>detalhe();
  dir.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{S.dias=+b.dataset.n;S.hover=null;detalhe()});

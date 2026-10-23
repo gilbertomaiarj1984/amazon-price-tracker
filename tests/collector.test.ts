@@ -109,3 +109,37 @@ describe("alertas na coleta", () => {
     expect(r.ok && r.alertas[0]?.evento).toMatchObject({ tipo: "novo_minimo", preco: 18, minimoAnterior: 20.1 });
   });
 });
+
+describe("última leitura do item (distingue aguardando, sem oferta e erro)", () => {
+  test("sem nenhuma leitura: nada registrado", () => {
+    expect(store.getUltimaColeta(add().id)).toBeNull();
+  });
+
+  test("página sem preço de destaque: leitura ok registrada, sem linha Amazon", async () => {
+    const p = add();
+    const r = await collectOne(store, p, fakeNet({ product: fx("product-unavailable.html") }).deps);
+    expect(r.ok).toBe(true);
+    expect(store.lastPoint(p.id, "amazon")).toBeNull();
+    expect(store.getUltimaColeta(p.id)).toMatchObject({ ok: true, buyBox: null });
+  });
+
+  test("captcha e 503: registra o motivo, sem inventar 'sem oferta'", async () => {
+    const p = add();
+    await collectOne(store, p, fakeNet({ product: fx("captcha.html") }).deps);
+    expect(store.getUltimaColeta(p.id)).toMatchObject({ ok: false, motivo: "captcha" });
+    await collectOne(store, p, fakeNet({ status: 503 }).deps);
+    expect(store.getUltimaColeta(p.id)).toMatchObject({ ok: false, motivo: "http_503" });
+    await collectOne(store, p, fakeNet().deps);
+    expect(store.getUltimaColeta(p.id)).toMatchObject({ ok: true, buyBox: 20.1 });
+  });
+
+  test("erro de rede (timeout): registra erro_rede e repassa a exceção", async () => {
+    const p = add();
+    const net = fakeNet();
+    net.deps.fetchHtml = async () => {
+      throw new Error("timeout");
+    };
+    await expect(collectOne(store, p, net.deps)).rejects.toThrow("timeout");
+    expect(store.getUltimaColeta(p.id)).toMatchObject({ ok: false, motivo: "erro_rede" });
+  });
+});

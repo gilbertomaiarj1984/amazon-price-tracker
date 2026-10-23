@@ -48,6 +48,15 @@ let uaCounter = 0;
 
 /** Uma coleta de um produto: página, painel se preciso, linhas, alertas, gravação. Em falha, não grava preço. */
 export async function collectOne(store: Store, product: Product, deps: CollectDeps): Promise<CollectOutcome> {
+  try {
+    return await collectInner(store, product, deps);
+  } catch (e) {
+    store.setUltimaColeta(product.id, { em: deps.now().toISOString(), ok: false, motivo: "erro_rede" });
+    throw e;
+  }
+}
+
+async function collectInner(store: Store, product: Product, deps: CollectDeps): Promise<CollectOutcome> {
   const ua = pickUserAgent(uaCounter++);
   const page = await deps.fetchHtml(productUrl(product.asin), { ua });
   const kind = detectBlock(page.html, page.status, "product");
@@ -90,11 +99,13 @@ export async function collectOne(store: Store, product: Product, deps: CollectDe
   if (parsed.titulo && parsed.titulo !== fresh.titulo) store.setTitulo(fresh.id, parsed.titulo);
   if (parsed.imagem && parsed.imagem !== fresh.imagem) store.setImagem(fresh.id, parsed.imagem);
   store.resetFailures(fresh.id);
+  store.setUltimaColeta(fresh.id, { em: at, ok: true, vendedor: parsed.buyBoxVendedor, buyBox: parsed.buyBox });
   return { ok: true, page: parsed, points, alertas, descartadas: descartadas.length, painel };
 }
 
 function failed(store: Store, product: Product, kind: BlockKind): CollectOutcome {
   const n = store.recordFailure(product.id);
+  store.setUltimaColeta(product.id, { em: new Date().toISOString(), ok: false, motivo: kind });
   // Um produto isolado falhando por muito tempo costuma ser link morto ou layout novo: avisa na 6ª e depois a cada 12.
   return { ok: false, kind, falhasProduto: n, avisarProduto: shouldAlertFailures(n, FAILURE_THRESHOLD * 2) };
 }
