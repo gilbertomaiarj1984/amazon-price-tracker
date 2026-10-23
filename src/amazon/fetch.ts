@@ -22,10 +22,10 @@ export function productUrl(asin: string): string {
   return normalizeUrl(asin);
 }
 
-/** Endpoint ajax do painel "Todas as ofertas". A confirmar com o spike. */
+/** Endpoint ajax do painel "Todas as ofertas" (confirmado no VPS em 23/10/2026). */
 export function offersUrl(asin: string): string {
   return (
-    `https://www.amazon.com.br/gp/product/ajax/ref=dp_aod_ALL_mbc?asin=${asin}` +
+    `https://www.amazon.com.br/gp/product/ajax/aodAjaxMain/ref=dp_aod_ALL_mbc?asin=${asin}` +
     `&m=&qid=&smid=&sourcecustomerorglistid=&sourcecustomerorglistitemid=&sr=&pc=dp&experienceId=aodAjaxMain`
   );
 }

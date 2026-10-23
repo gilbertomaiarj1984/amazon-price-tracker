@@ -2,7 +2,9 @@
 
 Rastreador pessoal de preços da Amazon Brasil. Você cola o link no bot do Telegram, define um preço-alvo e recebe um alerta quando o preço chegar lá. O histórico é guardado a cada 30 minutos.
 
-**Status:** em construção. Esta base traz o parser, a regra de linhas de preço, a regra de alertas, o banco SQLite e o script de teste de bloqueio. O bot, o agendador e o deploy vêm no PR seguinte.
+**Status:** em construção. Esta base traz o parser (calibrado com HTML real da amazon.com.br), a regra de linhas de preço, a regra de alertas, o banco SQLite e os scripts de diagnóstico. O bot, o agendador e o deploy vêm no PR seguinte.
+
+**Teste de bloqueio (feito no VPS, 23/10/2026):** a página do produto respondeu 50 de 50 vezes sem captcha nem 503. O painel "Todas as ofertas" responde em `/gp/product/ajax/aodAjaxMain/ref=dp_aod_ALL_mbc`.
 
 ## Como funciona
 
@@ -54,9 +56,9 @@ docker run --rm -v "$PWD":/app -w /app oven/bun:1 bun install --frozen-lockfile
 docker run --rm -v "$PWD":/app -w /app oven/bun:1 bun scripts/spike.ts --file links.txt --n 50 --offers
 ```
 
-Ele faz ~50 requisições espaçadas (2 a 5 s), imprime a taxa de sucesso por tipo de falha e salva o HTML bruto em `tests/fixtures/real/` (fora do git). Meta: pelo menos 90% de sucesso. Esses HTMLs servem para calibrar os seletores de `src/amazon/parse.ts`, que hoje foram escritos de memória e ainda não foram conferidos contra a página real. `bun scripts/spike.ts --dry` roda o script contra as fixtures sem usar a rede.
+Ele faz ~50 requisições espaçadas (2 a 5 s), imprime a taxa de sucesso por tipo de falha e salva o HTML bruto em `tests/fixtures/real/` (fora do git). Meta: pelo menos 90% de sucesso. Esses HTMLs serviram para calibrar os seletores de `src/amazon/parse.ts`. Se a Amazon mudar o layout, rode `scripts/inspect.ts`, `scripts/inspect-offers.ts` e `scripts/inspect-price.ts` sobre HTML novo para ver o que mudou. `bun scripts/spike.ts --dry` roda o script contra as fixtures sem usar a rede.
 
-O endereço do painel "Todas as ofertas" (`offersUrl` em `src/amazon/fetch.ts`) também precisa ser confirmado nesse teste.
+`scripts/probe-offers.ts` testa endereços candidatos do painel de ofertas.
 
 ## Isolamento
 
