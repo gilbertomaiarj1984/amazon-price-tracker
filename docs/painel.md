@@ -115,3 +115,5 @@ Na Amazon o mesmo produto costuma ter vários cadastros (edições, cores, anún
 3. No filtro da lista há o seletor **Todos os grupos / Sem grupo / cada grupo**.
 
 Apagar um grupo não apaga os itens. O alvo continua sendo por item. As escritas seguem atrás do login e respeitam `PANEL_READONLY=1`. O banco migra sozinho (nova tabela `grupos` e coluna `products.grupo_id`), sem mexer no histórico.
+
+Atalho: ao buscar (ex.: `random access`) e a lista mostrar 2 ou mais itens, aparece **Agrupar os N itens desta busca**; ele cria o grupo e coloca todos de uma vez.

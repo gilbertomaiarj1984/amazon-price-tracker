@@ -136,7 +136,7 @@ function initFiltros(){const el=$('#filtros');
   +'<div class="row"><select id="fst" aria-label="Status">'+opt(FILTROS,F.st)+'</select><select id="fgr" aria-label="Grupo">'+opt(Object.assign({'':'Todos os grupos',none:'Sem grupo'},gmap()),F.gr)+'</select><select id="fln" aria-label="Linha de preço">'+opt({'':'Qualquer linha',terceiros:'Com Terceiros ligada',usado:'Com Usado ligada'},F.ln)+'</select></div>'
   +'<div class="row"><span class="mut">Preço</span><input type="text" class="val" id="fmin" inputmode="decimal" placeholder="mín" value="'+esc(F.min)+'" aria-label="Preço mínimo"><input type="text" class="val" id="fmax" inputmode="decimal" placeholder="máx" value="'+esc(F.max)+'" aria-label="Preço máximo"></div>'
   +'<div class="row"><select id="ford" aria-label="Ordenar por">'+opt(ORD,F.ord)+'</select><button type="button" class="btn sm" id="fdir" title="Inverter ordem">'+(F.dir==='desc'?'↓ Decrescente':'↑ Crescente')+'</button><button type="button" class="btn sm" id="flimpa">Limpar</button></div>'
-  +'<div class="mut" id="fcount"></div>';
+  +'<div class="mut" id="fcount"></div><div id="fagr"></div>';
  const mudou=()=>{F.q=$('#fq').value;F.st=$('#fst').value;F.gr=$('#fgr').value;F.ln=$('#fln').value;F.min=$('#fmin').value.trim();F.max=$('#fmax').value.trim();F.ord=$('#ford').value;salvaF();renderEsq()};
  for(const id of ['fq','fmin','fmax'])$('#'+id).oninput=mudou;for(const id of ['fst','fgr','fln','ford'])$('#'+id).onchange=mudou;
  $('#fdir').onclick=e=>{F.dir=F.dir==='desc'?'asc':'desc';e.target.textContent=F.dir==='desc'?'↓ Decrescente':'↑ Crescente';salvaF();renderEsq()};
@@ -158,6 +158,10 @@ function renderEsq(){let h='';
  else if(!vis.length)h+='<div class="cd vazio">Nenhum item com esses filtros.</div>';
  $('#addbox').innerHTML=add;$('#lst').innerHTML=h;
  const ct=$('#fcount');if(ct)ct.textContent=vis.length+' de '+S.itens.length+' itens';
+ const ag=$('#fagr');if(ag){ag.innerHTML=S.edit&&F.q.trim()&&vis.length>=2&&vis.length<=30?'<button type="button" class="btn sm" id="agr">▦ Agrupar os '+vis.length+' itens desta busca</button>':'';
+  const b=$('#agr');if(b)b.onclick=()=>{const n=(prompt('Nome do grupo para estes '+vis.length+' itens:',F.q.trim())||'').trim();if(!n)return;
+   const mov=vis.filter(i=>i.grupoId!=null).length;if(mov&&!confirm(mov+' desses itens já estão em outro grupo e serão movidos. Continuar?'))return;
+   rodar(b,async()=>{const g=await api('POST','/api/grupos',{nome:n});for(const i of vis)await api('PUT','/api/itens/'+i.asin+'/grupo',{grupoId:g.id});aviso('Grupo criado com '+vis.length+' itens.');S.sel=null;F.q='';$('#fq').value='';F.gr=String(g.id);salvaF();abrirGrupo(g.id);await carregar()})}}
  $('#esq').querySelectorAll('.item').forEach(e=>e.onclick=()=>selecionar(e.dataset.asin));
  $('#lst').querySelectorAll('.alv').forEach(c=>{const asin=c.dataset.asin,inp=c.querySelector('input'),
   set=(b,val,msg)=>rodar(b,async()=>{await api('PUT','/api/itens/'+asin+'/alvo',{linha:'amazon',valor:val});aviso(msg);await carregar()});
