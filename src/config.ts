@@ -5,6 +5,8 @@ export interface Config {
   intervalMin: number;
   reqMinMs: number;
   reqMaxMs: number;
+  /** Painel web. Sem PANEL_PORT, desligado. */
+  panel: { host: string; port: number } | null;
 }
 
 function intOf(env: Record<string, string | undefined>, key: string, def: number, min: number): number {
@@ -29,5 +31,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     intervalMin: intOf(env, "INTERVAL_MIN", 30, 5),
     reqMinMs,
     reqMaxMs,
+    panel: env["PANEL_PORT"]?.trim() ? { host: env["PANEL_HOST"]?.trim() || "127.0.0.1", port: intOf(env, "PANEL_PORT", 0, 1) } : null,
   };
 }

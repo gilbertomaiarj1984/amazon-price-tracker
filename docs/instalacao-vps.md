@@ -80,7 +80,7 @@ TELEGRAM_BOT_TOKEN=123456789:AAH...    # token do Passo 1
 TELEGRAM_CHAT_ID=123456789             # número do Passo 2
 ```
 
-As demais variáveis são opcionais: `INTERVAL_MIN=30` (minutos entre rodadas, mínimo 5), `REQ_MIN_MS=2000` e `REQ_MAX_MS=5000` (pausa entre requisições à Amazon). O `.env` nunca vai para o git.
+O painel web é opcional (veja `docs/painel.md`). As demais variáveis são opcionais: `INTERVAL_MIN=30` (minutos entre rodadas, mínimo 5), `REQ_MIN_MS=2000` e `REQ_MAX_MS=5000` (pausa entre requisições à Amazon). O `.env` nunca vai para o git.
 
 ## Passo 5. Subir
 
