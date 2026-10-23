@@ -17,7 +17,7 @@ Adiciona na Amazon Brasil: botão **Rastrear este produto** na página do produt
 
 ## Selo de histórico (v2)
 
-Na página de um produto já rastreado aparece um selo com o veredito (menor preço de 30 dias, abaixo ou acima da média), mínimo, máximo e média. O endpoint devolve só esses números: nada de ofertas, vendedores, alvos ou configuração, e a senha do painel não é usada.
+Na página de um produto já rastreado aparece uma janela flutuante com o preço atual, o gráfico dos últimos 30 dias, o veredito (menor preço, abaixo ou acima da média), mínimo, máximo e média. Arraste pelo título; o botão – minimiza (o estado é lembrado). O endpoint devolve só esses números: nada de ofertas, vendedores, alvos ou configuração, e a senha do painel não é usada.
 
 ### 1. Gerar o token e ligar no VPS (usuário `deploy`)
 

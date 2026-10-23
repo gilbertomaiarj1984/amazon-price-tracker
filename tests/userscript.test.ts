@@ -55,3 +55,22 @@ describe("selo", () => {
     expect(sv({ rastreado: true, veredito: "x" }).linhas[0]).toBe("Histórico ainda curto");
   });
 });
+
+describe("gráfico do selo", () => {
+  const cg = (core as any).chartGeometry as (s: unknown, w: number, h: number, p: number) => any;
+  test("sem pontos válidos não desenha", () => {
+    expect(cg([], 280, 110, 8)).toBeNull();
+    expect(cg([{ t: "x", v: 1 }], 280, 110, 8)).toBeNull();
+  });
+  test("um ponto fica no centro e preço constante não quebra a escala", () => {
+    const g = cg([{ t: "2026-10-23T10:00:00Z", v: 162.96 }], 280, 110, 8);
+    expect(g.xy[0][0]).toBe(140);
+    expect(Number.isFinite(g.xy[0][1])).toBe(true);
+  });
+  test("preço menor fica mais abaixo; tempo cresce para a direita", () => {
+    const g = cg([{ t: "2026-10-01T00:00:00Z", v: 20 }, { t: "2026-10-10T00:00:00Z", v: 10 }], 280, 110, 8);
+    expect(g.xy[1][0]).toBeGreaterThan(g.xy[0][0]);
+    expect(g.xy[1][1]).toBeGreaterThan(g.xy[0][1]);
+    expect(g.xy.every(([x, y]: [number, number]) => x >= 0 && x <= 280 && y >= 0 && y <= 110)).toBe(true);
+  });
+});

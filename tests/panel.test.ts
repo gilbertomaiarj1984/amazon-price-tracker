@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { loadConfig } from "../src/config.ts";
 import { Store } from "../src/db.ts";
-import { amazonGaps, panelHandler } from "../src/panel.ts";
+import { amazonGaps, downsample, panelHandler } from "../src/panel.ts";
 
 const NOW = new Date("2026-10-23T15:00:00.000Z");
 let store: Store;
@@ -123,10 +123,23 @@ describe("selo do userscript", () => {
   });
   test("item rastreado devolve só o resumo", async () => {
     const j = (await sel("/api/selo/B097BYXGXN", TOKEN).json()) as any;
-    expect(Object.keys(j).sort()).toEqual(["atual", "atualizadoEm", "coletas", "linha", "max", "media", "min", "rastreado", "veredito"]);
+    expect(Object.keys(j).sort()).toEqual(["atual", "atualizadoEm", "coletas", "linha", "max", "media", "min", "rastreado", "serie", "veredito"]);
     expect(j.rastreado).toBe(true);
     expect(j.atual).toBe(10);
     expect(j.veredito).toBe("sem_dados");
+  });
+  test("série do gráfico em ordem de tempo", async () => {
+    const j = (await sel("/api/selo/B097BYXGXN", TOKEN).json()) as any;
+    expect(j.serie.length).toBe(2);
+    expect(j.serie[0].t < j.serie[1].t).toBe(true);
+    expect(Object.keys(j.serie[0]).sort()).toEqual(["t", "v"]);
+  });
+  test("downsample mantém extremos e limita o tamanho", () => {
+    const r = downsample(Array.from({ length: 1000 }, (_, i) => i), 120);
+    expect(r.length).toBe(120);
+    expect(r[0]).toBe(0);
+    expect(r[119]).toBe(999);
+    expect(downsample([1, 2, 3], 120)).toEqual([1, 2, 3]);
   });
   test("veredito pelo preço atual", async () => {
     const am = (preco: number) => ({ amazon: { linha: "amazon", preco, vendedor: "Amazon" } }) as const;
