@@ -282,6 +282,37 @@ describe("ações do painel (escrita)", () => {
     expect((await W(`/api/itens/${ASIN}`, "DELETE")).status).toBe(404);
   });
 
+  test("consultar agora: lê e grava, segura repetições por 5 min e libera depois", async () => {
+    const antes = net.calls.length;
+    const r = await W(`/api/itens/${ASIN}/consultar`, "POST");
+    expect(r.status).toBe(200);
+    const j = (await r.json()) as any;
+    expect(j.consulta).toBe("ok");
+    expect(net.calls.length).toBeGreaterThan(antes);
+    expect(j.consultaLiberadaEm).toBeTruthy();
+    const n = net.calls.length;
+    const de_novo = await W(`/api/itens/${ASIN}/consultar`, "POST");
+    expect(de_novo.status).toBe(429);
+    expect(net.calls.length).toBe(n);
+    net.clock.t += 5 * 60_000 + 1;
+    expect((await W(`/api/itens/${ASIN}/consultar`, "POST")).status).toBe(200);
+  });
+
+  test("consultar agora: falha de leitura é informada e também entra na espera", async () => {
+    net.status = 503;
+    const j = (await (await W(`/api/itens/${ASIN}/consultar`, "POST")).json()) as any;
+    expect(j.consulta).toBe("falhou");
+    expect(j.detalhe).toBeTruthy();
+    expect((await W(`/api/itens/${ASIN}/consultar`, "POST")).status).toBe(429);
+    expect((await W("/api/itens/B000000000/consultar", "POST")).status).toBe(404);
+  });
+
+  test("consultar agora: exige a proteção de origem e não existe em somenteLeitura", async () => {
+    expect((await W(`/api/itens/${ASIN}/consultar`, "POST", undefined, { origin: "http://evil.test" })).status).toBe(403);
+    handle = panelHandler({ store, now: () => NOW, intervalMin: 30, collect: async () => ({ ok: true }) as any, resolve: async () => ({ ok: true, asin: ASIN }), somenteLeitura: true });
+    expect((await W(`/api/itens/${ASIN}/consultar`, "POST")).status).toBe(405);
+  });
+
   test("CSRF: exige mesma origem, JSON e cabeçalho do painel", async () => {
     const body = { pausado: true };
     const path = `/api/itens/${ASIN}/pausa`;

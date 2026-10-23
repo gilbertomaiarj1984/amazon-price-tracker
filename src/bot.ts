@@ -1,4 +1,4 @@
-import { Actions, MAX_BATCH, RESOLVE_ERRORS, extractLinks, isMuted, muteKey } from "./actions.ts";
+import { Actions, MAX_BATCH, consultaLiberadaEm, RESOLVE_ERRORS, extractLinks, isMuted, muteKey } from "./actions.ts";
 import type { AsinResult } from "./amazon/asin.ts";
 import { productUrl } from "./amazon/fetch.ts";
 import { IMAGE_HOST_RE } from "./amazon/parse.ts";
@@ -94,7 +94,7 @@ export class Bot {
         return this.d.send(fmt.LISTA_AVISO);
       case "/item": {
         const p = await needP();
-        return p ? this.d.send(fmt.card(this.view(p)), alertKeyboard(p), photoOf(p)) : undefined;
+        return p ? this.d.send(fmt.card(this.view(p)), [...alertKeyboard(p), [{ text: "Consultar agora", callback_data: `q:${p.id}` }]], photoOf(p)) : undefined;
       }
       case "/historico": {
         const p = await needP();
@@ -219,6 +219,19 @@ export class Bot {
       case "m":
         this.act.silenciar(p, true);
         return this.d.send(`Ok, sem alertas de #${this.store.numberOf(p.id)} por 24 h.`);
+      case "q": {
+        const n = this.store.numberOf(p.id);
+        const espera = consultaLiberadaEm(this.store, p.id, this.d.now());
+        if (espera) {
+          const min = Math.max(1, Math.ceil((new Date(espera).getTime() - this.d.now().getTime()) / 60_000));
+          return this.d.send(`O item #${n} foi consultado há pouco. Tente de novo em ${min} min.`);
+        }
+        await this.d.send(`Consultando #${n} na Amazon…`);
+        const o = await this.act.consultar(p);
+        if (!o.ok) return this.d.send(`Não consegui ler agora${o.erro === "leitura" && o.detalhe ? ` (${o.detalhe})` : ""}. A próxima rodada tenta de novo.`);
+        const fresh = this.store.getById(p.id)!;
+        return this.d.send(fmt.card(this.view(fresh)), undefined, photoOf(fresh));
+      }
       case "rm": {
         const n = this.act.remove(p);
         return this.d.send(`Item #${n} removido. Os demais foram renumerados.`);
