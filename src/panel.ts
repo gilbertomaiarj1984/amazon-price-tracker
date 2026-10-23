@@ -23,6 +23,7 @@ export interface PanelItem {
   asin: string;
   titulo: string | null;
   pausado: boolean;
+  estrela: boolean;
   falhasSeguidas: number;
   silenciadoAte: string | null;
   url: string;
@@ -78,7 +79,7 @@ export function panelItems(store: Store, now: Date): PanelItem[] {
         "SELECT coletado_em AS t, preco AS v FROM price_lines WHERE product_id = ? AND linha = ? AND coletado_em >= ? ORDER BY coletado_em",
       )
       .all(p.id, v.linhas.amazon.atual != null || v.linhas.amazon.coletas > 0 ? "amazon" : "terceiros", desde) as PanelItem["mini"];
-    return { num: v.num, asin: p.asin, titulo: p.titulo, pausado: p.pausado, falhasSeguidas: p.falhasSeguidas, silenciadoAte: mutedUntil(store, p.id, now), url: productUrl(p.asin), imagem: p.imagem && IMAGE_HOST_RE.test(p.imagem) ? p.imagem : null, criadoEm: p.criadoEm, grupoId: p.grupoId, linhas: v.linhas, ultimaColeta: store.getUltimaColeta(p.id), mini: rows };
+    return { num: v.num, asin: p.asin, titulo: p.titulo, pausado: p.pausado, estrela: p.estrela, falhasSeguidas: p.falhasSeguidas, silenciadoAte: mutedUntil(store, p.id, now), url: productUrl(p.asin), imagem: p.imagem && IMAGE_HOST_RE.test(p.imagem) ? p.imagem : null, criadoEm: p.criadoEm, grupoId: p.grupoId, linhas: v.linhas, ultimaColeta: store.getUltimaColeta(p.id), mini: rows };
   });
 }
 
@@ -130,6 +131,7 @@ export function panelDetail(store: Store, p: Product, now: Date, days: number) {
     asin: p.asin,
     titulo: p.titulo,
     pausado: p.pausado,
+    estrela: p.estrela,
     silenciadoAte: mutedUntil(store, p.id, now),
     consultaLiberadaEm: consultaLiberadaEm(store, p.id, now),
     url: productUrl(p.asin),
@@ -170,6 +172,7 @@ export function panelGrupo(store: Store, g: Grupo, now: Date, days: number) {
         imagem: p.imagem && IMAGE_HOST_RE.test(p.imagem) ? p.imagem : null,
         url: productUrl(p.asin),
         pausado: p.pausado,
+        estrela: p.estrela,
         linha,
         atual: l.atual,
         vendedor: l.vendedor,
@@ -431,6 +434,9 @@ async function itemWrite(d: PanelDeps, act: Actions, method: string, p: Product,
     case "pausa":
       act.setPausa(p, bool(body["pausado"], "pausado"));
       return detail();
+    case "estrela":
+      act.setEstrela(p, bool(body["estrela"], "estrela"));
+      return detail();
     case "silencio":
       act.silenciar(p, bool(body["silenciado"], "silenciado"));
       return detail();
@@ -486,7 +492,7 @@ export function panelHandler(d: PanelDeps): (req: Request) => Promise<Response> 
     const url = new URL(req.url);
     const path = url.pathname;
     // Só estas rotas escrevem. /api/selo/* e o token do selo nunca chegam aqui.
-    const item = /^\/api\/itens\/([A-Z0-9]{10})(?:\/(alvo|pausa|silencio|linhas|consultar|grupo))?$/.exec(path);
+    const item = /^\/api\/itens\/([A-Z0-9]{10})(?:\/(alvo|pausa|estrela|silencio|linhas|consultar|grupo))?$/.exec(path);
     const grp = /^\/api\/grupos(?:\/(\d{1,9}))?$/.exec(path);
     const sug = /^\/api\/sugestoes\/(\d{1,9})\/(aceitar|recusar)$/.exec(path);
     if (!act || (path !== "/api/itens" && path !== "/api/importar" && !item && !grp && !sug)) return json({ erro: "método não permitido" }, 405);

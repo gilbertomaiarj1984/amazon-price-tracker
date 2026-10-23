@@ -37,7 +37,7 @@ scripts/spike.ts      teste de bloqueio, para rodar no VPS
 
 ## Comandos do bot
 
-Cole o link de um produto para rastrear. `/item N`, `/historico N`, `/linhas N`, `/alvo N [linha] valor`, `/pausar N`, `/remover N`, `/ajuda`.
+Cole o link de um produto para rastrear. `/item N`, `/historico N`, `/linhas N`, `/alvo N [linha] valor`, `/pausar N`, `/estrela N`, `/remover N`, `/ajuda`.
 
 ## Rodar
 

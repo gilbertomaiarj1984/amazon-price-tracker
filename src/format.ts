@@ -115,6 +115,7 @@ export const HELP = `<b>Comandos</b>
 <code>/alvo N valor</code>  alvo da linha Amazon
 <code>/alvo N terceiros valor</code>  alvo de outra linha
 <code>/pausar N</code>  pausa ou retoma
+<code>/estrela N</code>  liga ou desliga a estrela (prioridade na coleta)
 <code>/remover N</code>  apaga o item e o histórico
 
 Para rastrear, cole o link do produto (ou vários, um por linha, até 20).`;

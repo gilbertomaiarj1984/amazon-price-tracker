@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS products (
   pausado INTEGER NOT NULL DEFAULT 0,
   terceiros_on INTEGER NOT NULL DEFAULT 0,
   usado_on INTEGER NOT NULL DEFAULT 0,
-  falhas_seguidas INTEGER NOT NULL DEFAULT 0
+  falhas_seguidas INTEGER NOT NULL DEFAULT 0,
+  estrela INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS alvos (
   product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -96,6 +97,8 @@ export interface Product {
   imagem: string | null;
   /** Um item está em no máximo um grupo. */
   grupoId: number | null;
+  /** Prioridade: coletado antes dos outros em cada rodada. */
+  estrela: boolean;
 }
 
 export interface Grupo {
@@ -176,6 +179,7 @@ interface ProductRow {
   falhas_seguidas: number;
   imagem: string | null;
   grupo_id: number | null;
+  estrela?: number;
 }
 
 const toProduct = (r: ProductRow): Product => ({
@@ -189,6 +193,7 @@ const toProduct = (r: ProductRow): Product => ({
   falhasSeguidas: r.falhas_seguidas,
   imagem: r.imagem ?? null,
   grupoId: r.grupo_id ?? null,
+  estrela: r.estrela === 1,
 });
 
 export class Store {
@@ -200,6 +205,7 @@ export class Store {
     this.db.exec(SCHEMA);
     const cols = this.db.query("PRAGMA table_info(products)").all() as Array<{ name: string }>;
     if (!cols.some((c) => c.name === "imagem")) this.db.exec("ALTER TABLE products ADD COLUMN imagem TEXT");
+    if (!cols.some((c) => c.name === "estrela")) this.db.exec("ALTER TABLE products ADD COLUMN estrela INTEGER NOT NULL DEFAULT 0");
     if (!cols.some((c) => c.name === "grupo_id")) this.db.exec("ALTER TABLE products ADD COLUMN grupo_id INTEGER REFERENCES grupos(id) ON DELETE SET NULL");
   }
 
@@ -275,6 +281,10 @@ export class Store {
 
   setTitulo(id: number, titulo: string): void {
     this.db.query("UPDATE products SET titulo = ? WHERE id = ?").run(titulo, id);
+  }
+
+  setEstrela(id: number, estrela: boolean): void {
+    this.db.query("UPDATE products SET estrela = ? WHERE id = ?").run(estrela ? 1 : 0, id);
   }
 
   setPausado(id: number, pausado: boolean): void {

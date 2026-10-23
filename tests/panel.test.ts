@@ -257,6 +257,15 @@ describe("ações do painel (escrita)", () => {
     expect((await W(`/api/itens/${ASIN}/pausa`, "PUT", { pausado: "sim" })).status).toBe(400);
   });
 
+  test("estrela liga e desliga; valor precisa ser booleano", async () => {
+    const j = (await (await W(`/api/itens/${ASIN}/estrela`, "PUT", { estrela: true })).json()) as any;
+    expect(j.estrela).toBe(true);
+    expect(store.getById(1)!.estrela).toBe(true);
+    expect((await W(`/api/itens/${ASIN}/estrela`, "PUT", { estrela: false })).status).toBe(200);
+    expect(store.getById(1)!.estrela).toBe(false);
+    expect((await W(`/api/itens/${ASIN}/estrela`, "PUT", { estrela: 1 })).status).toBe(400);
+  });
+
   test("silencia por 24 h e reativa", async () => {
     let j = (await (await W(`/api/itens/${ASIN}/silencio`, "PUT", { silenciado: true })).json()) as any;
     expect(j.silenciadoAte).toBe(new Date(net.clock.t + 24 * 3_600_000).toISOString());

@@ -12,6 +12,7 @@ Painel com tudo o que o bot do Telegram faz, mais a leitura: lista de itens (min
 | `/linhas N` | **Linhas de preço**: ligar/desligar Terceiros e Usado (lê o produto na hora) |
 | `/alvo N valor` | **Preço-alvo** por linha, com campo para salvar e botão para remover |
 | `/pausar N` | **Pausar/Retomar coletas** |
+| `/estrela N` | **Estrela de prioridade** (coletado primeiro em cada rodada) |
 | botão **Consultar agora** (também no card do `/item N`) | Lê a Amazon na hora, só aquele item |
 | `/remover N` | **Remover item** (pede confirmação) |
 | botão "Silenciar 24 h" | **Silenciar alertas por 24 h** / reativar |
