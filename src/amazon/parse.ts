@@ -8,16 +8,15 @@ import type { BlockKind, Offer, ProductPage } from "../types.ts";
  * aqui com as fixtures salvas em tests/fixtures/real/.
  */
 
-const PRICE_SELECTORS = [
-  "#corePrice_feature_div .a-price .a-offscreen",
-  "#corePriceDisplay_desktop_feature_div .a-price .a-offscreen",
-  "#apex_desktop .priceToPay .a-offscreen",
-  ".priceToPay .a-offscreen",
-  "#price_inside_buybox",
-  "#priceblock_ourprice",
-  "#priceblock_dealprice",
-  ".a-price .a-offscreen",
+/** Blocos onde o preço de destaque mora, do mais para o menos confiável (conferido em HTML real). */
+const PRICE_SCOPES = [
+  "#corePrice_feature_div",
+  "#corePriceDisplay_desktop_feature_div",
+  "#apex_desktop",
+  "#desktop_buybox",
+  "#buybox",
 ];
+const LEGACY_PRICE_SELECTORS = ["#price_inside_buybox", "#priceblock_ourprice", "#priceblock_dealprice"];
 const OTHER_OFFERS_SELECTORS = [
   "#aod-ingress-link",
   "#dynamic-aod-ingress-box",
@@ -56,6 +55,36 @@ function firstText(root: HTMLElement, selectors: string[]): string | null {
   for (const s of selectors) {
     const t = txt(root.querySelector(s));
     if (t) return t;
+  }
+  return null;
+}
+
+/**
+ * Preço de um nó `.a-price`. O `.a-offscreen` costuma vir VAZIO: nesse caso o valor
+ * é montado das partes visíveis (a-price-whole + a-price-fraction).
+ */
+function priceFromNode(node: HTMLElement): number | null {
+  const off = parseBRL(txt(node.querySelector(".a-offscreen")), { exigirMoeda: true });
+  if (off != null) return off;
+  const whole = txt(node.querySelector(".a-price-whole")).replace(/\D/g, "");
+  const frac = txt(node.querySelector(".a-price-fraction")).replace(/\D/g, "");
+  if (!whole) return null;
+  const v = Number(`${whole}.${(frac || "0").padEnd(2, "0")}`);
+  return Number.isFinite(v) && v > 0 ? v : null;
+}
+
+/**
+ * Preço a pagar dentro de um bloco. Ignora o preço por unidade ("R$0,02 / Gramas")
+ * e o preço riscado "De: R$ X", que também são `.a-price`/`.a-offscreen` (classe a-text-price).
+ */
+function priceIn(scope: HTMLElement): number | null {
+  const label = scope.querySelector(".apex-pricetopay-accessibility-label, #apex-pricetopay-accessibility-label");
+  const fromLabel = parseBRL(txt(label), { exigirMoeda: true });
+  if (fromLabel != null) return fromLabel;
+  for (const node of scope.querySelectorAll(".a-price")) {
+    if ((node.getAttribute("class") ?? "").split(/\s+/).includes("a-text-price")) continue;
+    const v = priceFromNode(node);
+    if (v != null) return v;
   }
   return null;
 }
@@ -100,7 +129,15 @@ export function parseProductPage(html: string): ProductPage {
 
   const availability = txt(root.querySelector("#availability")).toLowerCase();
   const indisponivel = /indispon[ií]vel/.test(availability);
-  const buyBox = indisponivel ? null : parseBRL(firstText(root, PRICE_SELECTORS));
+  let buyBox: number | null = null;
+  if (!indisponivel) {
+    for (const sel of PRICE_SCOPES) {
+      const scope = root.querySelector(sel);
+      buyBox = scope ? priceIn(scope) : null;
+      if (buyBox != null) break;
+    }
+    if (buyBox == null) buyBox = parseBRL(firstText(root, LEGACY_PRICE_SELECTORS), { exigirMoeda: true });
+  }
 
   let vendedor =
     txt(root.querySelector("#sellerProfileTriggerId")) ||
@@ -131,10 +168,13 @@ export function parseProductPage(html: string): ProductPage {
   };
 }
 
+/**
+ * Só devolve frete quando o HTML traz um valor explícito ("+ R$ 24,90 de frete").
+ * "Frete/Entrega GRÁTIS" aparece como promoção condicional ("no seu primeiro pedido") e
+ * o frete real depende do CEP e é carregado depois, então fica null (desconhecido).
+ */
 function parseFrete(block: HTMLElement): number | null {
-  const t = txt(block);
-  if (/frete\s+gr[aá]tis|entrega\s+gr[aá]tis/i.test(t)) return 0;
-  const m = /(?:\+\s*)?R\$\s*([\d.]+(?:,\d{1,2})?)\s*(?:de\s+)?(?:frete|entrega)/i.exec(t);
+  const m = /(?:\+\s*)?R\$\s*([\d.]+(?:,\d{1,2})?)\s*(?:de\s+)?(?:frete|entrega)/i.exec(txt(block));
   return m ? parseBRL(m[1]) : null;
 }
 
@@ -160,13 +200,8 @@ export function parseOffersPanel(html: string): Offer[] {
   const out: Offer[] = [];
   const seen = new Set<string>();
   for (const b of blocks) {
-    // TODO(calibrar): a estrutura interna de #aod-price-N ainda não foi vista no HTML real.
     const priceScope = b.querySelector('[id^="aod-price-"]') ?? b.querySelector('[id="aod-offer-price"]') ?? b;
-    let preco: number | null = null;
-    for (const el of priceScope.querySelectorAll(".a-offscreen")) {
-      preco = parseBRL(txt(el), { exigirMoeda: true });
-      if (preco != null) break;
-    }
+    const preco = priceIn(priceScope);
     if (preco == null) continue;
     const soldBy = valueOf(b, "aod-offer-soldBy") || "Desconhecido";
     const shipsFrom = valueOf(b, "aod-offer-shipsFrom");

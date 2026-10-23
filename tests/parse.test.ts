@@ -103,12 +103,34 @@ describe("ingresso de outras ofertas (texto real)", () => {
   });
 });
 
+describe("preço com a estrutura real", () => {
+  test("não confunde preço por unidade nem preço 'De:' com o preço a pagar", () => {
+    const p = parseProductPage(fx("product-real-shape.html"));
+    expect(p.buyBox).toBe(20.1);
+    expect(p.vendidoPorAmazon).toBe(true);
+    expect(p.outrasOpcoes).toBe(2);
+    expect(p.outrasAPartirDe).toBe(20.1);
+  });
+  test("offscreen vazio: monta o preço de whole + fraction", () => {
+    const pad = "x".repeat(600);
+    const html = `<html><body><div id="dp"><span id="productTitle">X</span><div id="corePrice_feature_div"><span class="a-price"><span class="a-offscreen"></span><span><span class="a-price-whole">1.183<span class="a-price-decimal">,</span></span><span class="a-price-fraction">78</span></span></span></div><p>${pad}</p></div></body></html>`;
+    expect(parseProductPage(html).buyBox).toBe(1183.78);
+  });
+});
+
 describe("parseOffersPanel", () => {
   const offers = parseOffersPanel(fx("offers-panel.html"));
   test("lê todas as ofertas", () => expect(offers).toHaveLength(6));
   test("oferta da Amazon", () => {
     const a = offers.find((o) => o.vendidoPorAmazon && o.condicao === "novo");
-    expect(a).toMatchObject({ preco: 389, frete: 0, envio: "amazon" });
+    expect(a).toMatchObject({ preco: 389, frete: null, envio: "amazon" });
+  });
+  test("o preço de cada oferta é o a pagar, não o por unidade nem o 'De:'", () => {
+    expect(offers.map((o) => o.preco)).toEqual([389, 379, 387.9, 365, 120, 301]);
+  });
+  test("'Entrega GRÁTIS no primeiro pedido' não vira frete zero", () => {
+    const m = offers.find((o) => o.vendedor === "TechBras Store");
+    expect(m?.frete).toBeNull();
   });
   test("frete pago e entidade HTML", () => {
     const o = offers.find((x) => x.vendedor === "Casa & Som Outlet");

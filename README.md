@@ -11,8 +11,10 @@ Cada produto tem até três **linhas de preço**, cada uma com histórico e alvo
 | Linha | O que é |
 |---|---|
 | **Amazon** (principal) | Oferta vendida pela própria Amazon. Fica sem dado quando a Amazon não vende; nunca é preenchida com preço de terceiro. |
-| **Terceiros (novo)** | Menor `preço + frete` entre vendedores terceiros, condição nova. |
-| **Usado** | Menor `preço + frete` entre ofertas usadas. |
+| **Terceiros (novo)** | Menor preço anunciado entre vendedores terceiros, condição nova. |
+| **Usado** | Menor preço anunciado entre ofertas usadas. |
+
+**O frete não entra na conta.** No HTML ele vem vazio (carregado depois e dependente do CEP), e o texto "Entrega GRÁTIS" é promoção condicional. Os preços são os anunciados na página. Alguns vendedores destacam o preço **à vista no Pix** (cerca de 10% abaixo); o sistema usa o preço em destaque, que pode ser esse.
 
 A cada coleta o sistema guarda o instantâneo bruto das ofertas e deriva as linhas dele. Ofertas "novas" muito abaixo da mediana do grupo (menos de 50%) são descartadas como suspeitas.
 
