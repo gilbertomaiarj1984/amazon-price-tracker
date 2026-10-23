@@ -495,3 +495,12 @@ test("grupos da lista começam fechados e a busca olha dentro e fora deles", asy
   expect(js).toMatch(/buscando&&aqui\.length>0/);
   expect(js).toContain("sem(i.grupoId!=null?gnome(i.grupoId):'')");
 });
+
+test("grupos têm visual próprio e o número do item não aparece no nome", async () => {
+  const html = await (await get("/")).text();
+  const js = html.split("<script>")[1]!.split("</script>")[0]!;
+  expect(() => new Function(js)).not.toThrow();
+  expect(html).toContain(".itw.grp");
+  expect(js).toContain('class="gtag"');
+  expect(js).not.toMatch(/\.num\+'\. '/);
+});
