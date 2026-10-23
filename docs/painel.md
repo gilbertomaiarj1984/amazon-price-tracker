@@ -88,3 +88,11 @@ Remova o bloco do Caddyfile e recarregue o Caddy. Para tirar o painel do rastrea
 ## Acesso sem Caddy (alternativa)
 
 Sem passar pelo proxy dá para abrir por túnel SSH até o IP do container: `docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' price-tracker-tracker-1`, depois `ssh -N -L 8787:IP:8787 deploy@VPS` e http://localhost:8787 (use o IP da rede `price-tracker_default`).
+
+## Importar a lista do Keepa
+
+1. No navegador, abra https://keepa.com/manage (Manage Tracking) e use o botão de exportar (CSV). O arquivo tem só a coluna `ASIN`: não traz domínio, título nem preço-alvo.
+2. No painel, card **Importar do Keepa**, escolha o arquivo. Aceita também um `.txt` com ASINs ou links da amazon.com.br (um por linha). Links de outros países são ignorados e contados.
+3. O painel mostra o resumo (importados, repetidos, inválidos, outros países). Máximo de 200 itens por importação; arquivo até 6000 caracteres.
+
+Os itens entram **sem alvo** e sem ler a Amazon na hora (68 leituras seguidas dariam captcha). O título e o preço aparecem nas próximas rodadas, que já espaçam as requisições. Como o Keepa não informa o domínio, o painel assume amazon.com.br; ASINs que não existirem lá falham na coleta e você pode removê-los. Nenhum login nem chave do Keepa é usado.
