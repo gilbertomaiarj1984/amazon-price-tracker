@@ -147,7 +147,7 @@ export const MAX_GRUPOS = 100;
 export const MAX_NOME_GRUPO = 60;
 
 /** Linha que representa o item na comparação: Amazon se já houve coleta dela, senão Terceiros. */
-const linhaPrincipal = (v: ReturnType<typeof buildView>): LineKey => (v.linhas.amazon.coletas > 0 ? "amazon" : "terceiros");
+const linhaPrincipal = (v: ReturnType<typeof buildView>): LineKey => (v.linhas.amazon.coletas > 0 && !v.linhas.amazon.terceiro ? "amazon" : "terceiros");
 
 /** Itens do grupo lado a lado: preço atual, alvo e histórico de cada um. `menorAsin` é o item mais barato agora. */
 export function panelGrupo(store: Store, g: Grupo, now: Date, days: number) {
@@ -158,7 +158,8 @@ export function panelGrupo(store: Store, g: Grupo, now: Date, days: number) {
     .map((p) => {
       const v = buildView(store, p, now);
       const linha = linhaPrincipal(v);
-      const l = v.linhas[linha];
+      // Com a Amazon sem oferta, o preço e o alvo exibidos são os da linha Amazon (que mostra o terceiro); a série é a de Terceiros.
+      const l = v.linhas.amazon.terceiro ? v.linhas.amazon : v.linhas[linha];
       const serie = store.db
         .query("SELECT coletado_em AS t, preco AS v FROM price_lines WHERE product_id = ? AND linha = ? AND coletado_em >= ? ORDER BY coletado_em")
         .all(p.id, linha, desde) as Array<{ t: string; v: number }>;
@@ -222,8 +223,9 @@ export function downsample<T>(rows: T[], max: number): T[] {
 /** Dados mínimos para o selo do userscript: nada de ofertas, vendedores, alvos ou configuração. */
 export function panelSelo(store: Store, p: Product, now: Date): Selo {
   const v = buildView(store, p, now);
-  const linha: LineKey = v.linhas.amazon.coletas > 0 ? "amazon" : "terceiros";
-  const l = v.linhas[linha];
+  const fb = v.linhas.amazon.terceiro != null;
+  const linha: LineKey = v.linhas.amazon.coletas > 0 && !fb ? "amazon" : "terceiros";
+  const l = fb ? { ...v.linhas.terceiros, atual: v.linhas.amazon.atual } : v.linhas[linha];
   const desde = iso(now.getTime() - 30 * DAY_MS);
   const avg = store.db
     .query("SELECT AVG(preco) AS m, MAX(coletado_em) AS t FROM price_lines WHERE product_id = ? AND linha = ? AND coletado_em >= ?")

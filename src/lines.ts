@@ -21,20 +21,37 @@ export function dropSuspects(offers: Offer[]): { ok: Offer[]; descartadas: Offer
   return { ok, descartadas };
 }
 
+/** Menor preço total; no empate, quem é enviado pela Amazon, depois o nome do vendedor (resultado estável). */
 function cheapest(offers: Offer[]): Offer | null {
   let best: Offer | null = null;
-  for (const o of offers) if (!best || total(o) < total(best)) best = o;
+  for (const o of offers) {
+    if (!best) best = o;
+    else if (total(o) !== total(best)) best = total(o) < total(best) ? o : best;
+    else if (o.envio !== best.envio) best = o.envio === "amazon" ? o : best;
+    else if (o.vendedor < best.vendedor) best = o;
+  }
   return best;
+}
+
+/** Melhor terceiro (novo), mostrado no lugar da Amazon quando ela não vende. */
+export interface Fallback {
+  preco: number;
+  vendedor: string;
+  /** null = a página não informou quem envia (só a caixa de compra foi lida). */
+  envio: Offer["envio"] | null;
 }
 
 export interface Derived {
   points: Partial<Record<LineKey, LinePoint>>;
   descartadas: Offer[];
+  /** Só existe quando a Amazon não tem oferta nova. */
+  fallback: Fallback | null;
 }
 
 /**
  * Uma série por tipo de oferta. A linha Amazon só existe quando a própria Amazon
- * vende: nunca é preenchida com preço de terceiro.
+ * vende: nunca é preenchida com preço de terceiro. Sem Amazon, `fallback` traz o melhor
+ * terceiro novo (só para exibir e alertar) e ele também é gravado na série Terceiros.
  */
 export function deriveLines(
   page: ProductPage,
@@ -43,6 +60,7 @@ export function deriveLines(
 ): Derived {
   const points: Derived["points"] = {};
   const descartadas: Offer[] = [];
+  let fallback: Fallback | null = null;
 
   const amazonOffers = offers.filter((o) => o.vendidoPorAmazon && o.condicao === "novo");
   const fromPage = page.vendidoPorAmazon && page.buyBox != null ? page.buyBox : null;
@@ -52,12 +70,22 @@ export function deriveLines(
     .reduce<number | null>((min, v) => (min == null || v < min ? v : min), null);
   if (amazonPrice != null) points.amazon = { linha: "amazon", preco: amazonPrice, vendedor: "Amazon" };
 
-  if (enabled.terceiros) {
+  if (enabled.terceiros || amazonPrice == null) {
     const novos = offers.filter((o) => !o.vendidoPorAmazon && o.condicao === "novo");
     const { ok, descartadas: d } = dropSuspects(novos);
     descartadas.push(...d);
     const best = cheapest(ok);
-    if (best) points.terceiros = { linha: "terceiros", preco: total(best), vendedor: best.vendedor };
+    if (best) {
+      const ponto: LinePoint = { linha: "terceiros", preco: total(best), vendedor: best.vendedor };
+      // Sem Amazon, o melhor terceiro vira o preço exibido; a série Terceiros guarda o histórico dele.
+      if (amazonPrice == null) fallback = { preco: ponto.preco, vendedor: best.vendedor, envio: best.envio };
+      points.terceiros = ponto;
+    } else if (amazonPrice == null && page.buyBox != null && !page.vendidoPorAmazon && ok.length === 0 && novos.length === 0) {
+      // Painel sem terceiros, mas a caixa de compra da página é de um terceiro.
+      const vendedor = page.buyBoxVendedor ?? "Desconhecido";
+      fallback = { preco: page.buyBox, vendedor, envio: null };
+      points.terceiros = { linha: "terceiros", preco: page.buyBox, vendedor };
+    }
   }
   if (enabled.usado) {
     const usados = offers.filter((o) => o.condicao === "usado");
@@ -66,5 +94,5 @@ export function deriveLines(
     const best = cheapest(ok);
     if (best) points.usado = { linha: "usado", preco: total(best), vendedor: best.vendedor };
   }
-  return { points, descartadas };
+  return { points, descartadas, fallback };
 }

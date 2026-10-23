@@ -11,6 +11,12 @@ export const esc = (s: string): string => s.replace(/&/g, "&amp;").replace(/</g,
 
 export const pct = (v: number): string => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(1).replace(".", ",")}%`;
 
+/** "Mercado X · enviado pela Amazon (FBA)" para a linha Amazon que está mostrando um terceiro. */
+export const terceiroTxt = (vendedor: string | null, envio: "amazon" | "terceiro" | null | undefined): string =>
+  [vendedor ? esc(vendedor) : null, envio === "amazon" ? "enviado pela Amazon (FBA)" : envio === "terceiro" ? "enviado pelo vendedor" : null]
+    .filter(Boolean)
+    .join(" · ");
+
 const title = (v: { titulo: string | null; asin: string }): string => esc(v.titulo ?? `Produto ${v.asin}`);
 
 export function card(v: ProductView): string {
@@ -19,7 +25,11 @@ export function card(v: ProductView): string {
     `<b>${title(v)}</b>`,
     `<code>#${v.num} · ${v.asin}</code>`,
     "",
-    a.atual != null ? `<b>Amazon  ${money(a.atual)}</b>` : "<b>Amazon  sem oferta agora</b>",
+    a.terceiro
+      ? `<b>Melhor terceiro  ${money(a.atual)}</b>\n${terceiroTxt(a.vendedor, a.terceiro.envio)}\n<i>A Amazon não vende este item agora; este preço não é da Amazon.</i>`
+      : a.atual != null
+        ? `<b>Amazon  ${money(a.atual)}</b>`
+        : "<b>Amazon  sem oferta agora</b>",
   ];
   for (const k of ["terceiros", "usado"] as const) {
     const l = v.linhas[k];
@@ -27,7 +37,7 @@ export function card(v: ProductView): string {
     else if (l.atual == null) lines.push(`${LINE_NAMES[k]}  sem oferta`);
     else lines.push(`${LINE_NAMES[k]}  ${money(l.atual)}${l.vendedor ? ` · ${esc(l.vendedor)}` : ""}`);
   }
-  lines.push("", `Alvo Amazon: ${a.alvo != null ? `<b>${money(a.alvo)}</b>` : "não definido"}`);
+  lines.push("", `Alvo ${a.terceiro ? "(vale para o terceiro enquanto a Amazon não vende)" : "Amazon"}: ${a.alvo != null ? `<b>${money(a.alvo)}</b>` : "não definido"}`);
   if (v.pausado) lines.push("<i>Pausado</i>");
   return lines.join("\n");
 }
@@ -66,8 +76,14 @@ export function alert(item: AlertItem, view: ProductView): string {
     const alvo = view.linhas.amazon.alvo;
     return `<b>AMAZON VOLTOU A VENDER</b>\n<b>${name}</b>\n${money(e.preco)}\nAlvo ${alvo != null ? money(alvo) : "não definido"}`;
   }
-  const linha = LINE_NAMES[e.linha].toUpperCase();
-  const quem = e.linha === "amazon" ? "Vendido pela Amazon" : item.vendedor ? `Menor oferta: ${esc(item.vendedor)}` : "";
+  const linha = item.terceiro ? "MELHOR TERCEIRO (AMAZON SEM OFERTA)" : LINE_NAMES[e.linha].toUpperCase();
+  const quem = item.terceiro
+    ? `Terceiro, não é preço da Amazon: ${terceiroTxt(item.vendedor, item.terceiro.envio)}`
+    : e.linha === "amazon"
+      ? "Vendido pela Amazon"
+      : item.vendedor
+        ? `Menor oferta: ${esc(item.vendedor)}`
+        : "";
   if (e.tipo === "novo_minimo") {
     return `<b>NOVO MÍNIMO · ${linha}</b>\n<b>${name}</b>\n${money(e.preco)}\nMínimo anterior ${money(e.minimoAnterior)}\n${quem}`.trimEnd();
   }

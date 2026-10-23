@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { collectOne, needsPanel } from "../src/collector.ts";
 import { Store } from "../src/db.ts";
+import { buildView } from "../src/view.ts";
+import * as fmt from "../src/format.ts";
 import { fakeNet, fx, tick } from "./helpers.ts";
 
 /** Painel de ofertas sem nenhuma oferta (nem da Amazon). */
@@ -164,5 +166,62 @@ describe("caixa de compra de terceiro, Amazon Global só no painel de ofertas (B
     expect(net.calls).toEqual(["produto", "painel"]);
     expect(store.lastPoint(p.id, "amazon")).toMatchObject({ preco: 404.14, vendedor: "Amazon" });
     expect(store.getUltimaColeta(p.id)).toMatchObject({ ok: true });
+  });
+});
+
+describe("Amazon sem oferta: melhor terceiro", () => {
+  /** Painel real mínimo, mas com a oferta fixada trocada por um terceiro: nenhuma oferta é da Amazon. */
+  const semAmazon = () => ({
+    product: fx("product-third-party.html"),
+    panel: fx("offers-panel.html").replace("<span class=\"a-size-small a-color-base\">Amazon.com.br</span><div id=\"aod-offer-seller-rating\">", "<a class=\"a-size-small a-link-normal\">Loja Pinada</a><div id=\"aod-offer-seller-rating\">"),
+  });
+
+  test("usa a menor oferta nova (sem a suspeita), sem requisição extra e sem ligar Terceiros", async () => {
+    const net = fakeNet(semAmazon());
+    const p = add();
+    const r = await collectOne(store, p, net.deps);
+    expect(net.calls).toEqual(["produto", "painel"]);
+    expect(r.ok && r.points.amazon).toBeUndefined();
+    expect(store.getFallback(p.id)).toEqual({ preco: 379, vendedor: "TechBras Store", envio: "terceiro" });
+    // histórico separado: a série Amazon fica vazia e o terceiro vai para a série Terceiros
+    expect(store.lineStats(p.id, "amazon").coletas).toBe(0);
+    expect(store.lastPoint(p.id, "terceiros")?.preco).toBe(379);
+    const v = buildView(store, store.getById(p.id)!, net.deps.now());
+    expect(v.linhas.amazon).toMatchObject({ atual: 379, vendedor: "TechBras Store", terceiro: { envio: "terceiro" } });
+    expect(v.linhas.terceiros.ligada).toBe(false);
+    const card = fmt.card(v);
+    expect(card).toContain("Melhor terceiro");
+    expect(card).toContain("TechBras Store");
+    expect(card).toContain("não é da Amazon");
+  });
+
+  test("alvo da Amazon dispara com o terceiro e o alerta avisa que é terceiro; 'voltou' só com a Amazon de verdade", async () => {
+    const net = fakeNet(semAmazon());
+    const p = add();
+    store.setAlvo(p.id, "amazon", 400);
+    const a = await collectOne(store, p, net.deps);
+    expect(a.ok && a.alertas.map((x) => x.evento.tipo)).toEqual(["alvo"]);
+    const item = a.ok ? a.alertas[0]! : (null as never);
+    expect(item.terceiro).toEqual({ envio: "terceiro" });
+    const txt = fmt.alert(item, buildView(store, store.getById(p.id)!, net.deps.now()));
+    expect(txt).toContain("MELHOR TERCEIRO");
+    expect(txt).toContain("TechBras Store");
+    tick(net);
+    const b = await collectOne(store, p, net.deps);
+    expect(b.ok && b.alertas).toEqual([]);
+    tick(net);
+    Object.assign(net, { product: fx("product-real-shape.html"), panel: fx("offers-panel.html") });
+    const back = await collectOne(store, p, net.deps);
+    expect(back.ok && back.alertas.map((x) => x.evento.tipo)).toContain("voltou");
+    expect(store.getFallback(p.id)).toBeNull();
+    expect(buildView(store, store.getById(p.id)!, net.deps.now()).linhas.amazon.terceiro).toBeUndefined();
+  });
+
+  test("sem nenhuma oferta: continua 'sem oferta', sem fallback", async () => {
+    const net = fakeNet({ product: fx("product-unavailable.html"), panel: PAINEL_VAZIO });
+    const p = add();
+    await collectOne(store, p, net.deps);
+    expect(store.getFallback(p.id)).toBeNull();
+    expect(buildView(store, store.getById(p.id)!, net.deps.now()).linhas.amazon.atual).toBeNull();
   });
 });
