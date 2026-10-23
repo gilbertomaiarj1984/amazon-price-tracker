@@ -58,6 +58,7 @@ textarea{width:100%;resize:vertical;padding:8px}input.val{width:96px;text-align:
 .vazio{padding:40px 16px;text-align:center;color:var(--mut)}
 .gs{padding:10px 12px}.gs .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.gs .chip{border:1px dashed var(--axis);background:var(--sf2);border-radius:999px;padding:3px 10px;font-size:13px;font-weight:600;color:var(--fg2)}.gs .chip.on{border-style:solid;border-color:var(--acc);color:var(--acc)}
 .over{outline:2px dashed var(--acc);outline-offset:2px;background:var(--accsoft)}.itw.drag{opacity:.45}.itw[draggable=true] .item{cursor:grab}
+@media(min-width:901px){html,body{height:100%}main{height:100vh;display:flex;flex-direction:column;padding-bottom:16px}.split{flex:1;min-height:0;align-items:stretch;grid-template-rows:minmax(0,1fr)}.det{min-height:0;overflow-y:auto;overscroll-behavior:contain}.esq{display:flex;flex-direction:column;min-height:0}.esq>#addbox,.esq>#filtros{flex:none}#addbox{max-height:30vh;overflow-y:auto}#lst{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:4px}}
 @media(max-width:900px){.split{grid-template-columns:minmax(0,1fr)}}
 </style></head><body><main><h1>Rastreador de preços</h1><div id="saude" class="cd saude">Carregando…</div>
 <div class="split"><div class="esq" id="esq"><div id="addbox"></div><div class="cd cp" id="filtros"></div><div id="lst"></div></div><div class="cd det" id="dir"><div class="vazio">Carregando…</div></div></div></main>
@@ -174,7 +175,8 @@ function renderEsq(){let h='';
  h+='</div>';
  if(!S.itens.length)h+='<div class="cd vazio">Nenhum item rastreado. Cole um link da Amazon acima ou no bot do Telegram.</div>';
  else if(!vis.length)h+='<div class="cd vazio">Nenhum item com esses filtros.</div>';
- $('#addbox').innerHTML=add;$('#lst').innerHTML=h;
+ const sc=$('#lst').scrollTop;$('#addbox').innerHTML=add;$('#lst').innerHTML=h;$('#lst').scrollTop=sc;
+ if(!S.rolou&&S.sel){const el=$('#lst .itw.sel');if(el){S.rolou=1;el.scrollIntoView({block:'nearest'})}}
  const ct=$('#fcount');if(ct)ct.textContent=vis.length+' de '+S.itens.length+' itens';
  const ag=$('#fagr');if(ag){ag.innerHTML=S.edit&&F.q.trim()&&vis.length>=2&&vis.length<=30?'<button type="button" class="btn sm" id="agr">▦ Agrupar os '+vis.length+' itens desta busca</button>':'';
   const b=$('#agr');if(b)b.onclick=()=>{const n=(prompt('Nome do grupo para estes '+vis.length+' itens (sugestão pelos títulos, pode editar):',sugerirNome(vis))||'').trim();if(!n)return;
