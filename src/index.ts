@@ -102,7 +102,7 @@ const cycle = () =>
   }).finally(() => store.setMeta("last_cycle_at", String(Date.now())));
 
 if (cfg.panel) {
-  Bun.serve({ hostname: cfg.panel.host, port: cfg.panel.port, fetch: panelHandler({ store, now: () => new Date(), intervalMin: cfg.intervalMin }) });
+  Bun.serve({ hostname: cfg.panel.host, port: cfg.panel.port, fetch: panelHandler({ token: cfg.panelToken, store, now: () => new Date(), intervalMin: cfg.intervalMin }) });
   log(`painel em http://${cfg.panel.host}:${cfg.panel.port} (somente leitura)`);
 }
 
