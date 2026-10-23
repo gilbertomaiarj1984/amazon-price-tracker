@@ -504,3 +504,21 @@ test("grupos têm visual próprio e o número do item não aparece no nome", asy
   expect(js).toContain('class="gtag"');
   expect(js).not.toMatch(/\.num\+'\. '/);
 });
+
+test("card do grupo é compacto: sem foto e sem preço, só nome e número de itens", async () => {
+  const html = await (await get("/")).text();
+  const js = html.split("<script>")[1]!.split("</script>")[0]!;
+  expect(() => new Function(js)).not.toThrow();
+  const grp = js.split('class="item gi"')[1]!.split("</button>")[0]!;
+  expect(grp).not.toContain("foto(");
+  expect(grp).not.toContain("brl(");
+  expect(grp).toContain("itens</span>");
+});
+
+test("card do grupo ganha sinalizador verde quando há item dentro do alvo", async () => {
+  const html = await (await get("/")).text();
+  const js = html.split("<script>")[1]!.split("</script>")[0]!;
+  expect(() => new Function(js)).not.toThrow();
+  expect(js).toContain("status(x).k==='below'");
+  expect(js).toContain("dentro do alvo</span>':''");
+});
