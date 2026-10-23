@@ -37,6 +37,9 @@ describe("collectOne", () => {
     expect(needsPanel(add(), page)).toBe(true);
     expect(needsPanel(add(), { ...page, outrasOpcoes: null })).toBe(false);
     expect(needsPanel(add(), { ...page, vendidoPorAmazon: true })).toBe(false);
+    // Amazon Global na caixa de compra: a Amazon.com.br pode estar mais barata no painel, mesmo sem contagem de opções.
+    const global = { ...page, buyBoxVendedor: "Amazon Global", vendidoPorAmazon: true, outrasOpcoes: null };
+    expect(needsPanel(add(), global)).toBe(true);
   });
 
   test("captcha: não grava preço e conta a falha", async () => {
