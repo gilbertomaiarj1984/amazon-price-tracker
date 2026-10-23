@@ -66,8 +66,8 @@ textarea{width:100%;resize:vertical;padding:8px}input.val{width:96px;text-align:
 @media(min-width:901px){html,body{height:100%}main{height:100vh;display:flex;flex-direction:column;padding-bottom:12px}.split{flex:1;min-height:0;align-items:stretch;grid-template-rows:minmax(0,1fr)}.det{min-height:0;overflow-y:auto;overscroll-behavior:contain}.esq{display:flex;flex-direction:column;min-height:0;background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:8px}#lst{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:6px 12px 12px 6px}}
 @media(max-width:900px){.split{grid-template-columns:minmax(0,1fr)}}
 </style></head><body><main><header id="topo" class="cd"><div id="saude" class="saude">Carregando…</div>
-<div id="menu"><div class="mb"><button type="button" class="mbtn" data-pn="add" aria-expanded="false" hidden>＋ Rastrear produtos</button><button type="button" class="mbtn" data-pn="grp" aria-expanded="false" hidden>▦ Grupos <b id="ngrp"></b></button><button type="button" class="mbtn" data-pn="sug" aria-expanded="false" hidden>✦ Sugestões <b id="nsug"></b></button><button type="button" class="mbtn" data-pn="fil" aria-expanded="false">⚙ Filtros <b id="nfil"></b></button></div><div id="menuq"></div></div></header>
-<div id="pns"><div class="cd pn" id="pn-add" hidden></div><div class="cd pn" id="pn-grp" hidden></div><div class="cd pn" id="pn-sug" hidden></div><div class="cd pn" id="pn-fil" hidden></div></div>
+<div id="menu"><div class="mb"><button type="button" class="mbtn" data-pn="res" aria-expanded="false">📊 Resumo</button><button type="button" class="mbtn" data-pn="add" aria-expanded="false" hidden>＋ Rastrear produtos</button><button type="button" class="mbtn" data-pn="grp" aria-expanded="false" hidden>▦ Grupos <b id="ngrp"></b></button><button type="button" class="mbtn" data-pn="sug" aria-expanded="false" hidden>✦ Sugestões <b id="nsug"></b></button><button type="button" class="mbtn" data-pn="fil" aria-expanded="false">⚙ Filtros <b id="nfil"></b></button></div><div id="menuq"></div></div></header>
+<div id="pns"><div class="cd pn" id="pn-add" hidden></div><div class="cd pn" id="pn-grp" hidden></div><div class="cd pn" id="pn-sug" hidden></div><div class="cd pn" id="pn-fil" hidden></div><div class="cd pn" id="pn-res" hidden></div></div>
 <div class="split"><div class="esq" id="esq"><div id="lst"></div></div><div class="cd det" id="dir"><div class="vazio">Carregando…</div></div></div></main>
 <script>
 const $=s=>document.querySelector(s);
@@ -167,8 +167,29 @@ function renderSug(){const b=document.querySelector('.mbtn[data-pn=sug]'),n=S.su
  const el=$('#pn-sug');setHtml(el,h);
  el.querySelectorAll('[data-sa]').forEach(x=>x.onclick=()=>rodar(x,async()=>{aviso('Cadastrando e lendo o item…');const j=await api('POST','/api/sugestoes/'+x.dataset.sa+'/aceitar');aviso(j.leitura?'Item cadastrado e agrupado'+(j.alvoHerdado?' com o alvo do original.':'.'):'Item cadastrado e agrupado; a leitura entra na próxima rodada.');S.ult='';await carregar()}));
  el.querySelectorAll('[data-sr]').forEach(x=>x.onclick=()=>rodar(x,async()=>{await api('POST','/api/sugestoes/'+x.dataset.sr+'/recusar');aviso('Sugestão recusada. Não volta a aparecer.');await carregar()}))}
+/* resumo geral: só lê o que já está em S.itens, sem pedir nada à Amazon */
+function renderRes(){const it=S.itens,at=it.filter(i=>!i.pausado);
+ const c={dentro:0,ate20:0,acima:0,semAlvo:0,semPreco:0};
+ for(const i of at){if(i.falhasSeguidas>0||ap(i)==null){c.semPreco++;continue}const d=dist(i);if(d==null)c.semAlvo++;else if(d<=0)c.dentro++;else if(d<=LIMITE_LARANJA)c.ate20++;else c.acima++}
+ const li=(i,x)=>'<button type="button" class="row" data-rs="'+esc(i.asin)+'" style="width:100%;text-align:left;border:0;border-top:1px solid var(--bd);background:none;padding:6px 0"><span class="mut num">#'+i.num+'</span> <span style="flex:1 1 200px;min-width:0">'+esc(i.titulo||i.asin)+'</span><b class="preco">'+brl(ap(i))+'</b><span class="mut num">'+x+'</span></button>';
+ const pct=v=>(v>0?'+':'')+v.toFixed(1).replace('.',',')+'%';
+ const lista=(t,a,f,vazio)=>'<div style="min-width:0"><b>'+t+'</b>'+(a.length?a.map(f).join(''):'<div class="mut">'+vazio+'</div>')+'</div>';
+ const quedas=at.filter(i=>queda(i)!=null&&queda(i)<0).sort((a,b)=>queda(a)-queda(b)).slice(0,5);
+ const perto=at.filter(i=>i.falhasSeguidas<=0&&dist(i)!=null).sort((a,b)=>Math.abs(dist(a))-Math.abs(dist(b))).slice(0,5);
+ const prob=at.filter(i=>i.falhasSeguidas>0||lido(i)!=='ok').slice(0,5);
+ const card=(n,t,cor)=>'<div class="cd" style="padding:10px 14px;min-width:120px;flex:1"><div style="font-size:26px;font-weight:700;color:'+cor+'" class="num">'+n+'</div><div class="mut">'+t+'</div></div>';
+ const s=S.saude,h=S.sug.length;
+ let x='<h3 style="margin:0 0 10px">Resumo geral</h3><div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">'
+  +card(it.length,'itens rastreados'+(it.length-at.length?' ('+(it.length-at.length)+' pausados)':''),'var(--fg)')+card(c.dentro,'dentro do alvo','var(--good)')+card(c.ate20,'até '+LIMITE_LARANJA+'% acima do alvo','var(--lar)')+card(c.acima,'mais de '+LIMITE_LARANJA+'% acima','var(--verm)')+card(c.semAlvo,'sem alvo','var(--mut)')+card(c.semPreco,'sem preço ou com erro','var(--warn)')+'</div>'
+  +'<div class="mut" style="margin-bottom:12px">'+(s&&s.ultimaRodada?'Última coleta '+dt(s.ultimaRodada)+' ('+ago(s.ultimaRodada)+')':'Nenhuma coleta ainda')+' · '+h+' sugest'+(h===1?'ão pendente':'ões pendentes')+'</div>'
+  +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">'
+  +lista('Maiores quedas (7 dias)',quedas,i=>li(i,pct(queda(i))),'Nenhuma queda recente.')
+  +lista('Mais perto do alvo',perto,i=>li(i,dist(i)<=0?'dentro':pct(dist(i))),'Nenhum item com alvo.')
+  +lista('Sem coleta ou com erro',prob,i=>li(i,status(i).t),'Tudo coletado.')+'</div>';
+ const el=$('#pn-res');setHtml(el,x);
+ el.querySelectorAll('[data-rs]').forEach(b=>b.onclick=()=>{setPn(null);selecionar(b.dataset.rs)})}
 function setHtml(el,h){if(el._h!==h){el.innerHTML=h;el._h=h}}
-function setPn(n){S.pn=n;for(const k of ['add','grp','sug','fil'])$('#pn-'+k).hidden=n!==k;document.querySelectorAll('.mbtn').forEach(b=>b.setAttribute('aria-expanded',String(b.dataset.pn===n)))}
+function setPn(n){S.pn=n;for(const k of ['add','grp','sug','fil','res'])$('#pn-'+k).hidden=n!==k;document.querySelectorAll('.mbtn').forEach(b=>b.setAttribute('aria-expanded',String(b.dataset.pn===n)))}
 function renderEsq(){let h='',add='',grp='';
  if(S.edit)add+='<div><textarea id="txt" rows="3" maxlength="4000" placeholder="Cole um ou mais links da Amazon (um por linha, até 20)"></textarea><button class="btn pri" id="add">Rastrear</button><div id="res">'+S.ult+'</div>'
   +'<h3 style="font-size:14px;margin:14px 0 4px">Importar do Keepa</h3><div class="mut">Em keepa.com/manage use o botão de exportar (CSV) e escolha o arquivo aqui. Só ASINs; o alvo você define depois.</div><input type="file" id="arq" accept=".csv,.txt,text/csv,text/plain"><div id="imp"></div></div>';
@@ -381,7 +402,7 @@ function selecionar(asin){S.sel=asin;S.gsel=null;S.hover=null;try{history.replac
 async function carregar(){const d=await get('/api/itens');S.itens=d.itens;S.grupos=d.grupos||[];S.sug=d.sugestoes||[];renderSug();if(S.gsel!=null&&!S.grupos.some(g=>g.id===S.gsel))S.gsel=null;S.edit=!!d.edicao;S.saude=d.saude;
  if(!S.itens.some(i=>i.asin===S.sel))S.sel=S.itens.length?S.itens[0].asin:null;
  if(F.gr&&F.gr!=='none'&&!S.grupos.some(g=>String(g.id)===F.gr))F.gr='';
- initFiltros();renderSaude();renderEsq();if(!S.pnInit){S.pnInit=1;if(S.edit&&!S.itens.length)setPn('add')}await detalhe()}
+ initFiltros();renderSaude();renderRes();renderEsq();if(!S.pnInit){S.pnInit=1;if(S.edit&&!S.itens.length)setPn('add')}await detalhe()}
 document.querySelectorAll('.mbtn').forEach(b=>b.onclick=()=>setPn(S.pn===b.dataset.pn?null:b.dataset.pn));
 document.addEventListener('click',e=>{if(S.pn&&!e.target.closest('#topo,#pns'))setPn(null)});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.pn&&!S.drag)setPn(null)});

@@ -559,3 +559,13 @@ describe("sugestões", () => {
     expect(store.getSugestao(sid)!.status).toBe("pendente");
   });
 });
+
+test("painel tem a aba Resumo geral, somente leitura, com JS válido", async () => {
+  const html = await (await get("/")).text();
+  expect(html).toContain('data-pn="res"');
+  expect(html).toContain('id="pn-res"');
+  const js = html.split("<script>")[1]!.split("</script>")[0]!;
+  expect(js).toContain("function renderRes()");
+  const corpo = js.split("function renderRes()")[1]!.split("function setHtml")[0]!;
+  expect(corpo).not.toMatch(/api\(|get\(|fetch\(/);
+});
