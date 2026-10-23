@@ -87,6 +87,10 @@ function aviso(t,bad){let e=$('#aviso');if(!e){e=document.createElement('div');e
 async function rodar(btn,fn){if(btn)btn.disabled=true;try{await fn()}catch(e){aviso(e.message,1)}finally{if(btn)btn.disabled=false}}
 const hashAsin=()=>{const h=location.hash.slice(1);return /^[A-Z0-9]{10}$/.test(h)?h:null};
 const S={abertos:new Set(),itens:[],grupos:[],gsel:null,gdet:null,edit:false,sel:hashAsin(),dias:14,visao:'grafico',det:null,ult:'',saude:null,hover:null};
+const TK='painel-tela-v1';
+const salvaT=()=>{try{localStorage.setItem(TK,JSON.stringify({dias:S.dias,visao:S.visao,abertos:[...S.abertos],gsel:S.gsel,sel:S.sel}))}catch(e){}};
+try{const t=JSON.parse(localStorage.getItem(TK)||'{}');if([7,14,30].includes(t.dias))S.dias=t.dias;if(t.visao==='grafico'||t.visao==='tabela')S.visao=t.visao;if(Array.isArray(t.abertos))for(const g of t.abertos)if(Number.isInteger(g))S.abertos.add(g);
+ if(!S.sel){if(Number.isInteger(t.gsel))S.gsel=t.gsel;else if(typeof t.sel==='string'&&/^[A-Z0-9]{10}$/.test(t.sel))S.sel=t.sel}}catch(e){}
 const MOTIVOS={captcha:'captcha da Amazon',http_503:'Amazon respondeu 503',http_error:'erro HTTP',vazio:'página vazia',html_inesperado:'página em formato inesperado',erro_rede:'falha de rede'};
 const motivo=m=>MOTIVOS[m]||m||'motivo desconhecido';
 /* nunca = ainda sem leitura; erro = leitura falhou e nada foi gravado; ok = leu (a Amazon pode não ter oferta) */
@@ -169,7 +173,7 @@ function renderSug(){const b=document.querySelector('.mbtn[data-pn=sug]'),n=S.su
  el.querySelectorAll('[data-sr]').forEach(x=>x.onclick=()=>rodar(x,async()=>{await api('POST','/api/sugestoes/'+x.dataset.sr+'/recusar');aviso('Sugestão recusada. Não volta a aparecer.');await carregar()}))}
 function setHtml(el,h){if(el._h!==h){el.innerHTML=h;el._h=h}}
 function setPn(n){S.pn=n;for(const k of ['add','grp','sug','fil'])$('#pn-'+k).hidden=n!==k;document.querySelectorAll('.mbtn').forEach(b=>b.setAttribute('aria-expanded',String(b.dataset.pn===n)))}
-function renderEsq(){let h='',add='',grp='';
+function renderEsq(){let h='',add='',grp='';salvaT();
  if(S.edit)add+='<div><textarea id="txt" rows="3" maxlength="4000" placeholder="Cole um ou mais links da Amazon (um por linha, até 20)"></textarea><button class="btn pri" id="add">Rastrear</button><div id="res">'+S.ult+'</div>'
   +'<h3 style="font-size:14px;margin:14px 0 4px">Importar do Keepa</h3><div class="mut">Em keepa.com/manage use o botão de exportar (CSV) e escolha o arquivo aqui. Só ASINs; o alvo você define depois.</div><input type="file" id="arq" accept=".csv,.txt,text/csv,text/plain"><div id="imp"></div></div>';
  if(S.edit)grp+='<div class="gs"><b style="font-size:14px">Grupos</b> <span class="mut">Arraste um item sobre outro item ou sobre um grupo para agrupar.</span><div class="chips">'+S.grupos.map(g=>'<button type="button" class="chip'+(S.gsel===g.id?' on':'')+'" data-g="'+g.id+'">▦ '+esc(g.nome)+' ('+S.itens.filter(i=>i.grupoId===g.id).length+')</button>').join('')+'<button type="button" class="chip" data-g="none" title="Solte aqui para tirar o item do grupo">✕ Sem grupo</button></div></div>';
@@ -373,7 +377,7 @@ function renderGrupo(){const g=S.gdet,dir=$('#dir');if(!g){dir.innerHTML='<div c
  grupoGrafico(g);
  const gr=dir.querySelector('[data-gr]');if(gr)gr.onclick=()=>{const n=(prompt('Novo nome do grupo. Sugestão pelos itens: '+sugerirNome(g.itens),g.nome)||'').trim();if(!n||n===g.nome)return;rodar(gr,async()=>{await api('PUT','/api/grupos/'+g.id,{nome:n});aviso('Grupo renomeado.');await carregar()})};
  const gd=dir.querySelector('[data-gd]');if(gd)gd.onclick=()=>{if(!confirm('Apagar o grupo? Os itens continuam rastreados, só ficam sem grupo.'))return;rodar(gd,async()=>{await api('DELETE','/api/grupos/'+g.id);aviso('Grupo apagado.');S.gsel=null;F.gr='';salvaF();await carregar()})}}
-async function detalhe(){if(S.gsel!=null){try{S.gdet=await get('/api/grupos/'+S.gsel+'?dias='+S.dias)}catch(e){S.gdet=null;S.gsel=null}renderDir();return}
+async function detalhe(){salvaT();if(S.gsel!=null){try{S.gdet=await get('/api/grupos/'+S.gsel+'?dias='+S.dias)}catch(e){S.gdet=null;S.gsel=null}renderDir();return}
  if(!S.sel){S.det=null;renderDir();return}
  try{S.det=await get('/api/itens/'+S.sel+'?dias='+S.dias)}catch(e){S.det=null;S.sel=null}
  renderDir()}
