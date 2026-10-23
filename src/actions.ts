@@ -109,6 +109,13 @@ export class Actions {
     return novo;
   }
 
+  /** Inverte a estrela de prioridade, ou fixa o valor dado. Devolve o novo estado. */
+  setEstrela(p: Product, estrela?: boolean): boolean {
+    const novo = estrela ?? !p.estrela;
+    this.store.setEstrela(p.id, novo);
+    return novo;
+  }
+
   silenciar(p: Product, on: boolean): string | null {
     const until = on ? new Date(this.d.now().getTime() + MUTE_MS).toISOString() : null;
     this.store.setMeta(muteKey(p.id), until);

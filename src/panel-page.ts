@@ -22,7 +22,7 @@ h1{font-size:22px;margin:0 0 14px;letter-spacing:-.01em}
 .split{display:grid;grid-template-columns:minmax(0,350px) minmax(0,1fr);gap:20px;align-items:start}
 .esq{display:grid;gap:12px;min-width:0}
 .pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;border-radius:999px;padding:2px 9px;background:var(--sf2);color:var(--fg2);white-space:nowrap}
-.pill.below{background:var(--goodbg);color:var(--good)}.pill.warn{background:var(--larbg);color:var(--lar)}.pill.hot{background:var(--badbg);color:var(--bad)}.pill.gap{background:var(--warnbg);color:var(--warn)}.pill.paused{color:var(--mut)}.pill.fail{background:var(--badbg);color:var(--bad)}
+.pill.below{background:var(--goodbg);color:var(--good)}.pill.warn{background:var(--larbg);color:var(--lar)}.pill.hot{background:var(--badbg);color:var(--bad)}.pill.gap{background:var(--warnbg);color:var(--warn)}.star{color:#e6a700}.pill.paused{color:var(--mut)}.pill.fail{background:var(--badbg);color:var(--bad)}
 .lista{display:grid;gap:8px}
 .itw{border:1px solid var(--bd);background:var(--sf);border-radius:12px;overflow:hidden}.itw:hover{background:var(--sf2)}.itw.grp,.itw.grp:hover{background:var(--accsoft);border:2px solid var(--acc);border-left-width:8px;box-shadow:5px 5px 0 -1px var(--accsoft),5px 5px 0 0 var(--acc)}.itw.grp .ti b{font-size:15px;font-weight:700;color:var(--acc)}.gtag{display:block;font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--acc);margin-bottom:1px}.pill.gp{background:var(--acc);color:var(--sf)}.gmem{margin:2px 0 6px 14px;padding-left:12px;border-left:3px solid var(--acc);display:grid;gap:8px}.itw.in{border:2px solid var(--okb)}.itw.warn{border:2px solid var(--lar)}.itw.hot{border:2px solid var(--verm)}.itw.in .alv{border-top-color:var(--okb)}.itw.warn .alv{border-top-color:var(--lar)}.itw.hot .alv{border-top-color:var(--verm)}.itw.sel{box-shadow:0 0 0 3px var(--accsoft),0 0 0 4px var(--acc)}
 .item.gi{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"t s";padding:6px 10px;gap:8px}.itw.grp .item.gi .ti b{font-size:14px}
@@ -129,13 +129,13 @@ function ultima(i){const m=i.mini;return m.length?Date.parse(m[m.length-1].t):nu
 function preco(i){const a=i.linhas.amazon;if(a.atual!=null)return a.atual;const o=['terceiros','usado'].map(k=>i.linhas[k].atual).filter(v=>v!=null);return o.length?Math.min(...o):null}
 const gmap=()=>Object.fromEntries(S.grupos.map(g=>[String(g.id),g.nome]));
 const gnome=id=>(S.grupos.find(g=>g.id===id)||{}).nome;
-const FILTROS={'':'Todos os status',dentro:'Dentro do alvo',acima:'Acima do alvo',semalvo:'Sem alvo',pausado:'Pausados',falha:'Com falha na coleta',semoferta:'Amazon sem oferta',semcoleta:'Sem coleta ainda'};
+const FILTROS={'':'Todos os status',dentro:'Dentro do alvo',acima:'Acima do alvo',semalvo:'Sem alvo',pausado:'Pausados',falha:'Com falha na coleta',semoferta:'Amazon sem oferta',semcoleta:'Sem coleta ainda',estrela:'Só com estrela ★'};
 function passa(i){const a=i.linhas.amazon,t=sem(i.titulo)+' '+i.asin.toLowerCase()+' '+sem(i.grupoId!=null?gnome(i.grupoId):'');
  if(F.q&&!F.q.split(/\\s+/).every(w=>t.includes(sem(w))))return false;
  switch(F.st){case 'dentro':if(!(ap(i)!=null&&a.alvo!=null&&ap(i)<=a.alvo))return false;break;
   case 'acima':if(!(ap(i)!=null&&a.alvo!=null&&ap(i)>a.alvo))return false;break;
   case 'semalvo':if(a.alvo!=null)return false;break;case 'pausado':if(!i.pausado)return false;break;
-  case 'falha':if(!(i.falhasSeguidas>0))return false;break;case 'semoferta':if(!(lido(i)==='ok'&&a.atual==null))return false;break;
+  case 'estrela':if(!i.estrela)return false;break;case 'falha':if(!(i.falhasSeguidas>0))return false;break;case 'semoferta':if(!(lido(i)==='ok'&&a.atual==null))return false;break;
   case 'semcoleta':if(lido(i)==='ok')return false;break}
  if(F.gr==='none'?i.grupoId!=null:F.gr&&String(i.grupoId)!==F.gr)return false;
  if(F.ln&&!i.linhas[F.ln].ligada)return false;
@@ -145,6 +145,7 @@ function passa(i){const a=i.linhas.amazon,t=sem(i.titulo)+' '+i.asin.toLowerCase
 const ORD={num:['Ordem de cadastro',i=>i.num],nome:['Nome',i=>sem(i.titulo||i.asin)],preco:['Preço atual',preco],dist:['Distância até o alvo (%)',dist],var30:['Variação 30 dias',i=>i.linhas.amazon.variacao],queda:['Queda recente (7 dias)',queda],coleta:['Última coleta',ultima],criado:['Data de cadastro',i=>Date.parse(i.criadoEm)]};
 function visiveis(){const f=ORD[F.ord]||ORD.num,sg=F.dir==='desc'?-1:1;
  return S.itens.filter(passa).map(i=>({i,k:f[1](i)})).sort((x,y)=>{
+  if(x.i.estrela!==y.i.estrela)return x.i.estrela?-1:1;
   if(x.k==null||y.k==null)return x.k==null&&y.k==null?x.i.num-y.i.num:x.k==null?1:-1;
   const c=typeof x.k==='string'?x.k.localeCompare(y.k,'pt-BR'):x.k-y.k;return c?c*sg:x.i.num-y.i.num}).map(o=>o.i)}
 function nFiltros(){const n=[F.st,F.gr,F.ln,F.min,F.max].filter(Boolean).length;const b=$('#nfil');if(b)b.textContent=n?'('+n+')':''}
@@ -201,7 +202,7 @@ function renderEsq(){let h='',add='',grp='';
   const al=a.alvo,chips=ap(i)!=null?[5,10,15].map(p=>{const v=Math.round(ap(i)*(1-p/100));return '<button type="button" class="btn sm" data-cv="'+v+'" title="'+brl(v)+'">−'+p+'%</button>'}).join(''):'';
   const alv=S.edit?'<div class="alv" data-asin="'+esc(i.asin)+'"><span class="mut">Alvo</span><input type="text" class="val" inputmode="decimal" placeholder="ex.: 449" value="'+(al!=null?String(al).replace('.',','):'')+'" aria-label="Alvo da Amazon do item '+i.num+'"><button type="button" class="btn sm pri" data-cs="1">Definir</button>'+chips+(al!=null?'<button type="button" class="btn sm" data-cx="1" title="Remover alvo">×</button>':'')+'</div>':'';
   return '<div class="itw'+(!(i.falhasSeguidas>0)&&{below:' in',warn:' warn',hot:' hot'}[st.k]||'')+(i.asin===S.sel?' sel':'')+'"'+(S.edit?' draggable="true" data-dr="'+esc(i.asin)+'"':'')+'><button type="button" class="item" data-asin="'+esc(i.asin)+'" aria-pressed="'+(i.asin===S.sel)+'">'+foto(i)
-   +'<span class="ti"><b>'+esc(i.titulo||i.asin)+'</b></span><span class="pr num">'+(ap(i)!=null?brl(ap(i)):'—')+'</span>'
+   +'<span class="ti"><b>'+(i.estrela?'<span class="star" title="Prioridade">★</span> ':'')+esc(i.titulo||i.asin)+'</b></span><span class="pr num">'+(ap(i)!=null?brl(ap(i)):'—')+'</span>'
    +'<span class="stt">'+pill(st)+tags+'</span>'+degraus(i.mini,80,26,cor)+'</button>'+alv+'</div>'};
  const vistos=new Set();
  for(const i of vis){
@@ -306,7 +307,7 @@ function renderDir(){if(S.gsel!=null)return renderGrupo();const d=S.det,it=S.ite
  if(!d||!it){$('#dir').innerHTML='<div class="vazio">'+(S.itens.length?'Selecione um item.':'Nenhum item selecionado.')+'</div>';return}
  const L=d.linhas,st=status(it),url=d.url&&d.url.startsWith('https:'+'//www.amazon.com.br/')?d.url:null;
  let h='<div class="dh"><div style="display:flex;gap:14px;min-width:0">'+foto(it)+'<div><h2>'+esc(d.titulo||d.asin)+'</h2><div class="meta"><span class="mono">#'+d.num+' · '+esc(d.asin)+'</span>'+pill(st)+(d.silenciadoAte?'<span class="pill">alertas silenciados até '+esc(new Date(d.silenciadoAte).toLocaleString('pt-BR'))+'</span>':'')+'</div></div></div>';
- h+='<div class="act">'+(url?'<a class="btn sm" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Abrir na Amazon</a>':'')+(S.edit?'<button class="btn sm" data-q="1"'+(libera(d)?' disabled':'')+'>'+(libera(d)?'Consultar em '+libera(d)+' min':'Consultar agora')+'</button><button class="btn sm" data-p="1">'+(d.pausado?'Retomar':'Pausar')+'</button><button class="btn sm" data-s="1">'+(d.silenciadoAte?'Reativar alertas':'Silenciar 24 h')+'</button><button class="btn sm bad" data-r="1">Remover</button>':'')+'</div></div>';
+ h+='<div class="act">'+(url?'<a class="btn sm" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Abrir na Amazon</a>':'')+(S.edit?'<button class="btn sm" data-q="1"'+(libera(d)?' disabled':'')+'>'+(libera(d)?'Consultar em '+libera(d)+' min':'Consultar agora')+'</button><button class="btn sm" data-st="1">'+(d.estrela?'★ Tirar estrela':'☆ Dar estrela')+'</button><button class="btn sm" data-p="1">'+(d.pausado?'Retomar':'Pausar')+'</button><button class="btn sm" data-s="1">'+(d.silenciadoAte?'Reativar alertas':'Silenciar 24 h')+'</button><button class="btn sm bad" data-r="1">Remover</button>':'')+'</div></div>';
  h+='<div class="row" style="margin-top:12px"><span class="mut">Grupo</span>'+(S.edit?'<select id="dg" aria-label="Grupo do item"><option value="">Sem grupo</option>'+S.grupos.map(g=>'<option value="'+g.id+'"'+(g.id===it.grupoId?' selected':'')+'>'+esc(g.nome)+'</option>').join('')+'<option value="new">+ Novo grupo…</option></select>':'<b>'+esc(gnome(it.grupoId)||'—')+'</b>')+(it.grupoId!=null?'<button type="button" class="btn sm" data-vg="1">Ver grupo</button>':'')+'</div>';
  h+='<div class="tw"><table><tr><th>Linha de preço</th><th class="n">Agora</th><th class="n">Alvo</th><th class="n">Mín 30 d</th><th class="n">Máx 30 d</th><th class="n">Variação</th>'+(S.edit?'<th>Coleta</th>':'')+'</tr>';
  LK.forEach((k,idx)=>{const l=L[k],on=ativa(l);
@@ -336,6 +337,7 @@ function renderDir(){if(S.gsel!=null)return renderGrupo();const d=S.det,it=S.ite
   i.onchange=salvar;i.onkeydown=e=>{if(e.key==='Enter')i.blur()}});
  dir.querySelectorAll('[data-linha]').forEach(b=>b.onchange=()=>rodar(b,async()=>{const k=b.dataset.linha,on=b.checked;if(on)aviso('Lendo o produto…');const j=await api('PUT',A+'/linhas',{linha:k,ligada:on});aviso(on?(j.leitura==='ok'?'Linha ligada.':'Linha ligada, mas não consegui ler agora; entra na próxima rodada.'):'Linha desligada. O histórico fica guardado.',on&&j.leitura!=='ok');await carregar()}));
  dir.querySelector('[data-q]').onclick=e=>rodar(e.target,async()=>{aviso('Consultando a Amazon… pode levar alguns segundos.');const j=await api('POST',A+'/consultar');aviso(j.consulta==='ok'?'Consulta feita: preços atualizados.':'Não consegui ler agora'+(j.detalhe?' ('+j.detalhe+')':'')+'. A próxima rodada tenta de novo.',j.consulta!=='ok');S.ult='';await carregar()});
+ dir.querySelector('[data-st]').onclick=e=>rodar(e.target,async()=>{await api('PUT',A+'/estrela',{estrela:!d.estrela});aviso(d.estrela?'Estrela removida.':'Item com estrela: é coletado primeiro em cada rodada.');await carregar()});
  dir.querySelector('[data-p]').onclick=e=>rodar(e.target,async()=>{await api('PUT',A+'/pausa',{pausado:!d.pausado});aviso(d.pausado?'Coletas retomadas.':'Item pausado: sem coletas nem alertas.');await carregar()});
  dir.querySelector('[data-s]').onclick=e=>rodar(e.target,async()=>{await api('PUT',A+'/silencio',{silenciado:!d.silenciadoAte});aviso(d.silenciadoAte?'Alertas reativados.':'Sem alertas por 24 h.');await carregar()});
  dir.querySelector('[data-r]').onclick=e=>{if(!confirm('Remover este item e apagar o histórico?'))return;rodar(e.target,async()=>{await api('DELETE',A);aviso('Item removido. Os demais foram renumerados.');S.sel=null;S.ult='';await carregar()})}}
