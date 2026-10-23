@@ -56,6 +56,8 @@ textarea{width:100%;resize:vertical;padding:8px}input.val{width:96px;text-align:
 #aviso{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);max-width:90%;padding:10px 14px;border-radius:8px;background:var(--fg);color:var(--sf);font-size:14px;display:none;z-index:9}
 #aviso.bad{background:var(--bad);color:#fff}
 .vazio{padding:40px 16px;text-align:center;color:var(--mut)}
+.gs{padding:10px 12px}.gs .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.gs .chip{border:1px dashed var(--axis);background:var(--sf2);border-radius:999px;padding:3px 10px;font-size:13px;font-weight:600;color:var(--fg2)}.gs .chip.on{border-style:solid;border-color:var(--acc);color:var(--acc)}
+.over{outline:2px dashed var(--acc);outline-offset:2px;background:var(--accsoft)}.itw.drag{opacity:.45}.itw[draggable=true] .item{cursor:grab}
 @media(max-width:900px){.split{grid-template-columns:minmax(0,1fr)}}
 </style></head><body><main><h1>Rastreador de preços</h1><div id="saude" class="cd saude">Carregando…</div>
 <div class="split"><div class="esq" id="esq"><div id="addbox"></div><div class="cd cp" id="filtros"></div><div id="lst"></div></div><div class="cd det" id="dir"><div class="vazio">Carregando…</div></div></div></main>
@@ -119,7 +121,7 @@ const gmap=()=>Object.fromEntries(S.grupos.map(g=>[String(g.id),g.nome]));
 const gnome=id=>(S.grupos.find(g=>g.id===id)||{}).nome;
 const FILTROS={'':'Todos os status',dentro:'Dentro do alvo',acima:'Acima do alvo',semalvo:'Sem alvo',pausado:'Pausados',falha:'Com falha na coleta',semoferta:'Amazon sem oferta',semcoleta:'Sem coleta ainda'};
 function passa(i){const a=i.linhas.amazon,t=sem(i.titulo)+' '+i.asin.toLowerCase();
- if(F.q&&!F.q.split(/\s+/).every(w=>t.includes(sem(w))))return false;
+ if(F.q&&!F.q.split(/\\s+/).every(w=>t.includes(sem(w))))return false;
  switch(F.st){case 'dentro':if(!(a.atual!=null&&a.alvo!=null&&a.atual<=a.alvo))return false;break;
   case 'acima':if(!(a.atual!=null&&a.alvo!=null&&a.atual>a.alvo))return false;break;
   case 'semalvo':if(a.alvo!=null)return false;break;case 'pausado':if(!i.pausado)return false;break;
@@ -149,25 +151,39 @@ function initFiltros(){const el=$('#filtros');
 function renderEsq(){let h='';
  if(S.edit)h+='<details class="cd cp"'+(S.itens.length?'':' open')+'><summary style="cursor:pointer;font-weight:600">Rastrear produtos</summary><div style="margin-top:10px"><textarea id="txt" rows="3" maxlength="4000" placeholder="Cole um ou mais links da Amazon (um por linha, até 20)"></textarea><button class="btn pri" id="add">Rastrear</button><div id="res">'+S.ult+'</div>'
   +'<h3 style="font-size:14px;margin:14px 0 4px">Importar do Keepa</h3><div class="mut">Em keepa.com/manage use o botão de exportar (CSV) e escolha o arquivo aqui. Só ASINs; o alvo você define depois.</div><input type="file" id="arq" accept=".csv,.txt,text/csv,text/plain"><div id="imp"></div></div></details>';
+ if(S.edit)h+='<div class="cd gs"><b style="font-size:14px">Grupos</b> <span class="mut">Arraste um item sobre outro item ou sobre um grupo para agrupar.</span><div class="chips">'+S.grupos.map(g=>'<button type="button" class="chip'+(S.gsel===g.id?' on':'')+'" data-g="'+g.id+'">▦ '+esc(g.nome)+' ('+S.itens.filter(i=>i.grupoId===g.id).length+')</button>').join('')+'<button type="button" class="chip" data-g="none" title="Solte aqui para tirar o item do grupo">✕ Sem grupo</button></div></div>';
  const add=h;h='<div class="lista">';const vis=visiveis();
- for(const i of vis){const a=i.linhas.amazon,st=status(i);
-  const tags=(i.silenciadoAte?'<span class="pill">alertas silenciados</span>':'')+(i.falhasSeguidas>0?'<span class="pill fail">falha na coleta</span>':'')+(i.grupoId!=null&&gnome(i.grupoId)?'<span class="pill">▦ '+esc(gnome(i.grupoId))+'</span>':'');
+ const card=i=>{const a=i.linhas.amazon,st=status(i);
+  const tags=(i.silenciadoAte?'<span class="pill">alertas silenciados</span>':'')+(i.falhasSeguidas>0?'<span class="pill fail">falha na coleta</span>':'')+'';
   const cor=a.coletas?COR.amazon:COR.terceiros;
   const al=a.alvo,chips=a.atual!=null?[5,10,15].map(p=>{const v=Math.round(a.atual*(1-p/100));return '<button type="button" class="btn sm" data-cv="'+v+'" title="'+brl(v)+'">−'+p+'%</button>'}).join(''):'';
   const alv=S.edit?'<div class="alv" data-asin="'+esc(i.asin)+'"><span class="mut">Alvo</span><input type="text" class="val" inputmode="decimal" placeholder="ex.: 449" value="'+(al!=null?String(al).replace('.',','):'')+'" aria-label="Alvo da Amazon do item '+i.num+'"><button type="button" class="btn sm pri" data-cs="1">Definir</button>'+chips+(al!=null?'<button type="button" class="btn sm" data-cx="1" title="Remover alvo">×</button>':'')+'</div>':'';
-  h+='<div class="itw'+(!(i.falhasSeguidas>0)&&{below:' in',warn:' warn',hot:' hot'}[st.k]||'')+(i.asin===S.sel?' sel':'')+'"><button type="button" class="item" data-asin="'+esc(i.asin)+'" aria-pressed="'+(i.asin===S.sel)+'">'+foto(i)
+  return '<div class="itw'+(!(i.falhasSeguidas>0)&&{below:' in',warn:' warn',hot:' hot'}[st.k]||'')+(i.asin===S.sel?' sel':'')+'"'+(S.edit?' draggable="true" data-dr="'+esc(i.asin)+'"':'')+'><button type="button" class="item" data-asin="'+esc(i.asin)+'" aria-pressed="'+(i.asin===S.sel)+'">'+foto(i)
    +'<span class="ti"><b>'+i.num+'. '+esc(i.titulo||i.asin)+'</b></span><span class="pr num">'+(a.atual!=null?brl(a.atual):'—')+'</span>'
-   +'<span class="stt">'+pill(st)+tags+'</span>'+degraus(i.mini,80,26,cor)+'</button>'+alv+'</div>'}
+   +'<span class="stt">'+pill(st)+tags+'</span>'+degraus(i.mini,80,26,cor)+'</button>'+alv+'</div>'};
+ const selI=S.itens.find(x=>x.asin===S.sel),vistos=new Set();
+ for(const i of vis){
+  if(i.grupoId==null||!gnome(i.grupoId)){h+=card(i);continue}
+  if(vistos.has(i.grupoId))continue;vistos.add(i.grupoId);
+  const gid=i.grupoId,todos=S.itens.filter(x=>x.grupoId===gid),aqui=vis.filter(x=>x.grupoId===gid);
+  const precos=todos.map(preco).filter(v=>v!=null),men=precos.length?Math.min(...precos):null,rep=todos.slice().sort((x,y)=>(preco(x)??1e9)-(preco(y)??1e9))[0];
+  const aberto=S.gsel===gid||F.gr===String(gid)||(selI&&selI.grupoId===gid&&S.gsel==null);
+  h+='<div class="itw grp'+(S.gsel===gid?' sel':'')+'" data-dg="'+gid+'"><button type="button" class="item" data-gid="'+gid+'" aria-pressed="'+(S.gsel===gid)+'">'+foto(rep)
+   +'<span class="ti"><b>▦ '+esc(gnome(gid))+'</b></span><span class="pr num">'+(men!=null?brl(men):'—')+'</span><span class="stt"><span class="pill">'+todos.length+' itens</span>'+(men!=null?'<span class="mut">menor preço</span>':'')+'</span></button></div>';
+  if(aberto)h+='<div style="margin-left:18px;display:grid;gap:8px">'+aqui.map(card).join('')+'</div>'}
  h+='</div>';
  if(!S.itens.length)h+='<div class="cd vazio">Nenhum item rastreado. Cole um link da Amazon acima ou no bot do Telegram.</div>';
  else if(!vis.length)h+='<div class="cd vazio">Nenhum item com esses filtros.</div>';
  $('#addbox').innerHTML=add;$('#lst').innerHTML=h;
  const ct=$('#fcount');if(ct)ct.textContent=vis.length+' de '+S.itens.length+' itens';
  const ag=$('#fagr');if(ag){ag.innerHTML=S.edit&&F.q.trim()&&vis.length>=2&&vis.length<=30?'<button type="button" class="btn sm" id="agr">▦ Agrupar os '+vis.length+' itens desta busca</button>':'';
-  const b=$('#agr');if(b)b.onclick=()=>{const n=(prompt('Nome do grupo para estes '+vis.length+' itens:',F.q.trim())||'').trim();if(!n)return;
+  const b=$('#agr');if(b)b.onclick=()=>{const n=(prompt('Nome do grupo para estes '+vis.length+' itens (sugestão pelos títulos, pode editar):',sugerirNome(vis))||'').trim();if(!n)return;
    const mov=vis.filter(i=>i.grupoId!=null).length;if(mov&&!confirm(mov+' desses itens já estão em outro grupo e serão movidos. Continuar?'))return;
    rodar(b,async()=>{const g=await api('POST','/api/grupos',{nome:n});for(const i of vis)await api('PUT','/api/itens/'+i.asin+'/grupo',{grupoId:g.id});aviso('Grupo criado com '+vis.length+' itens.');S.sel=null;F.q='';$('#fq').value='';F.gr=String(g.id);salvaF();abrirGrupo(g.id);await carregar()})}}
  $('#esq').querySelectorAll('.item').forEach(e=>e.onclick=()=>selecionar(e.dataset.asin));
+ if(S.edit)ligarDrag();
+ $('#esq').querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{if(b.dataset.g!=='none')abrirGrupo(Number(b.dataset.g))});
+ $('#lst').querySelectorAll('[data-gid]').forEach(b=>b.onclick=()=>abrirGrupo(Number(b.dataset.gid)));
  $('#lst').querySelectorAll('.alv').forEach(c=>{const asin=c.dataset.asin,inp=c.querySelector('input'),
   set=(b,val,msg)=>rodar(b,async()=>{await api('PUT','/api/itens/'+asin+'/alvo',{linha:'amazon',valor:val});aviso(msg);await carregar()});
   c.querySelector('[data-cs]').onclick=e=>{const t=inp.value.trim();if(!t)return aviso('Digite um valor.',1);set(e.target,t,'Alvo salvo.')};
@@ -270,7 +286,7 @@ function renderDir(){if(S.gsel!=null)return renderGrupo();const d=S.det,it=S.ite
  const vg=dir.querySelector('[data-vg]');if(vg)vg.onclick=()=>abrirGrupo(it.grupoId);
  if(!S.edit)return;
  const dg=dir.querySelector('#dg');if(dg)dg.onchange=()=>rodar(dg,async()=>{let v=dg.value;
-  if(v==='new'){const n=(prompt('Nome do novo grupo:')||'').trim();if(!n){dg.value=it.grupoId==null?'':String(it.grupoId);return}v=String((await api('POST','/api/grupos',{nome:n})).id)}
+  if(v==='new'){const n=(prompt('Nome do novo grupo (sugestão pelo título, pode editar):',sugerirNome([it]))||'').trim();if(!n){dg.value=it.grupoId==null?'':String(it.grupoId);return}v=String((await api('POST','/api/grupos',{nome:n})).id)}
   await api('PUT',A+'/grupo',{grupoId:v===''?null:Number(v)});aviso(v===''?'Item fora de grupos.':'Item colocado no grupo.');await carregar()});
  dir.querySelectorAll('[data-alvo]').forEach(i=>{const k=i.dataset.alvo,salvar=()=>{const t=i.value.trim();if((t===''?null:t)===(L[k].alvo!=null?String(L[k].alvo).replace('.',','):null))return;rodar(i,async()=>{await api('PUT',A+'/alvo',{linha:k,valor:t===''?null:t});aviso(t===''?'Alvo removido.':'Alvo salvo.');await carregar()})};
   i.onchange=salvar;i.onkeydown=e=>{if(e.key==='Enter')i.blur()}});
@@ -280,8 +296,26 @@ function renderDir(){if(S.gsel!=null)return renderGrupo();const d=S.det,it=S.ite
  dir.querySelector('[data-s]').onclick=e=>rodar(e.target,async()=>{await api('PUT',A+'/silencio',{silenciado:!d.silenciadoAte});aviso(d.silenciadoAte?'Alertas reativados.':'Sem alertas por 24 h.');await carregar()});
  dir.querySelector('[data-r]').onclick=e=>{if(!confirm('Remover este item e apagar o histórico?'))return;rodar(e.target,async()=>{await api('DELETE',A);aviso('Item removido. Os demais foram renumerados.');S.sel=null;S.ult='';await carregar()})}}
 
+/* sugestão de nome: palavras que todos os títulos têm em comum (na ordem do primeiro); sem nenhuma, as 4 primeiras palavras */
+function sugerirNome(its){const ts=its.map(i=>String(i.titulo||i.asin).replace(/[()\\[\\]{},;:|]/g,' ').split(/\\s+/).filter(Boolean));if(!ts.length)return '';
+ const outros=ts.slice(1).map(t=>new Set(t.map(sem))),com=ts[0].filter(w=>w.length>1&&outros.every(o=>o.has(sem(w))));
+ const n=(com.length?com:ts[0].slice(0,4)).slice(0,6).join(' ');return n.length>60?n.slice(0,60).trim():n}
+/* arrastar e soltar: item sobre item agrupa os dois; item sobre um grupo (ou "Sem grupo") move o item */
+async function colocar(asin,gid,msg){await api('PUT','/api/itens/'+asin+'/grupo',{grupoId:gid});aviso(msg);await carregar()}
+function soltarEmItem(src,dst){const a=S.itens.find(i=>i.asin===src),b=S.itens.find(i=>i.asin===dst);if(!a||!b||a===b)return;
+ if(b.grupoId!=null){if(a.grupoId===b.grupoId)return;return rodar(null,()=>colocar(a.asin,b.grupoId,'Item colocado em '+gnome(b.grupoId)+'.'))}
+ if(a.grupoId!=null)return rodar(null,()=>colocar(b.asin,a.grupoId,'Item colocado em '+gnome(a.grupoId)+'.'));
+ const n=(prompt('Nome do grupo para estes 2 itens (sugestão pelos títulos, pode editar):',sugerirNome([a,b]))||'').trim();if(!n)return;
+ rodar(null,async()=>{const g=await api('POST','/api/grupos',{nome:n});await api('PUT','/api/itens/'+a.asin+'/grupo',{grupoId:g.id});await colocar(b.asin,g.id,'Grupo criado com 2 itens.');abrirGrupo(g.id)})}
+function ligarDrag(){const alvo=(el,fn)=>{el.ondragover=e=>{if(!S.drag)return;e.preventDefault();el.classList.add('over')};el.ondragleave=()=>el.classList.remove('over');
+  el.ondrop=e=>{e.preventDefault();el.classList.remove('over');const src=S.drag;S.drag=null;if(src)fn(src)}};
+ $('#lst').querySelectorAll('[data-dr]').forEach(el=>{el.ondragstart=e=>{S.drag=el.dataset.dr;el.classList.add('drag');try{e.dataTransfer.setData('text/plain',S.drag);e.dataTransfer.effectAllowed='move'}catch(x){}};
+  el.ondragend=()=>{S.drag=null;el.classList.remove('drag');document.querySelectorAll('.over').forEach(o=>o.classList.remove('over'))};
+  alvo(el,src=>soltarEmItem(src,el.dataset.dr))});
+ $('#lst').querySelectorAll('[data-dg]').forEach(b=>alvo(b,src=>{const it=S.itens.find(i=>i.asin===src);if(it&&it.grupoId!==Number(b.dataset.dg))rodar(null,()=>colocar(src,Number(b.dataset.dg),'Item colocado no grupo.'))}));
+ $('#esq').querySelectorAll('[data-g]').forEach(b=>alvo(b,src=>{const g=b.dataset.g;if(g==='none'){const it=S.itens.find(i=>i.asin===src);if(it&&it.grupoId!=null)rodar(null,()=>colocar(src,null,'Item fora de grupos.'))}else rodar(null,()=>colocar(src,Number(g),'Item colocado no grupo.'))}))}
 const GC=['#2a78d6','#eb6834','#1baf7a','#8a5cd6','#c9a100','#d6407a','#5c6b78','#0aa5b5'];
-function abrirGrupo(id){S.gsel=id;S.gdet=null;S.hover=null;F.gr=String(id);salvaF();renderEsq();detalhe();if(innerWidth<=900)$('#dir').scrollIntoView({behavior:'smooth',block:'start'})}
+function abrirGrupo(id){S.gsel=id;S.gdet=null;S.hover=null;renderEsq();detalhe();if(innerWidth<=900)$('#dir').scrollIntoView({behavior:'smooth',block:'start'})}
 function grupoGrafico(g){const host=$('#gchart');if(!host)return;const W=host.clientWidth||840,H=270,L=62,R=14,T=14,B=28,x0=Date.parse(g.desde),x1=Date.now();
  const vals=g.itens.flatMap(i=>i.serie.map(p=>p.v));if(!vals.length){host.innerHTML='<p class="mut">Sem coletas neste período.</p>';return}
  let y0=Math.min(...vals),y1=Math.max(...vals);const sp=Math.max(y1-y0,y1*.05);y0-=sp*.12;y1+=sp*.12;
@@ -305,7 +339,7 @@ function renderGrupo(){const g=S.gdet,dir=$('#dir');if(!g){dir.innerHTML='<div c
  dir.querySelectorAll('[data-op]').forEach(a=>a.onclick=e=>{e.preventDefault();selecionar(a.dataset.op)});
  dir.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{S.dias=+b.dataset.n;detalhe()});
  grupoGrafico(g);
- const gr=dir.querySelector('[data-gr]');if(gr)gr.onclick=()=>{const n=(prompt('Novo nome do grupo:',g.nome)||'').trim();if(!n||n===g.nome)return;rodar(gr,async()=>{await api('PUT','/api/grupos/'+g.id,{nome:n});aviso('Grupo renomeado.');await carregar()})};
+ const gr=dir.querySelector('[data-gr]');if(gr)gr.onclick=()=>{const n=(prompt('Novo nome do grupo. Sugestão pelos itens: '+sugerirNome(g.itens),g.nome)||'').trim();if(!n||n===g.nome)return;rodar(gr,async()=>{await api('PUT','/api/grupos/'+g.id,{nome:n});aviso('Grupo renomeado.');await carregar()})};
  const gd=dir.querySelector('[data-gd]');if(gd)gd.onclick=()=>{if(!confirm('Apagar o grupo? Os itens continuam rastreados, só ficam sem grupo.'))return;rodar(gd,async()=>{await api('DELETE','/api/grupos/'+g.id);aviso('Grupo apagado.');S.gsel=null;F.gr='';salvaF();await carregar()})}}
 async function detalhe(){if(S.gsel!=null){try{S.gdet=await get('/api/grupos/'+S.gsel+'?dias='+S.dias)}catch(e){S.gdet=null;S.gsel=null}renderDir();return}
  if(!S.sel){S.det=null;renderDir();return}
