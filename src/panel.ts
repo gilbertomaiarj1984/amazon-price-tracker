@@ -1,3 +1,4 @@
+import { parseKeepaList, MAX_IMPORT } from "./keepa.ts";
 import { Actions, MAX_BATCH, RESOLVE_ERRORS, extractLinks, mutedUntil } from "./actions.ts";
 import type { ActionDeps } from "./actions.ts";
 import { productUrl } from "./amazon/fetch.ts";
@@ -290,6 +291,32 @@ async function addItems(store: Store, act: Actions, now: Date, body: Record<stri
   return { resultados, ignorados: Math.max(0, all.length - MAX_BATCH) };
 }
 
+export interface ImportResult {
+  importados: number;
+  duplicados: number;
+  invalidos: number;
+  outrosPaises: number;
+  acimaDoLimite: number;
+}
+
+/** Importa ASINs (export do Keepa) sem ler a Amazon: o item entra sem alvo e a coleta fica para as próximas rodadas. */
+function importItems(store: Store, now: Date, body: Record<string, unknown>): ImportResult {
+  if (typeof body["texto"] !== "string" || body["texto"].length > 6000) throw new HttpError(400, "arquivo grande demais (até 6000 caracteres, cerca de 500 ASINs)");
+  const p = parseKeepaList(body["texto"]);
+  if (!p.asins.length) throw new HttpError(400, "Não achei nenhum ASIN nesse arquivo.");
+  let importados = 0;
+  let duplicados = p.duplicadosNoArquivo;
+  const usados = p.asins.slice(0, Math.max(0, MAX_IMPORT));
+  for (const asin of usados) {
+    if (store.getByAsin(asin)) duplicados++;
+    else {
+      store.addProduct(asin, null, now.toISOString());
+      importados++;
+    }
+  }
+  return { importados, duplicados, invalidos: p.invalidos, outrosPaises: p.outrosPaises, acimaDoLimite: p.asins.length - usados.length };
+}
+
 /** Rotas de escrita sobre um item (por ASIN). Devolvem o detalhe atualizado. */
 async function itemWrite(d: PanelDeps, act: Actions, method: string, p: Product, sub: string | undefined, req: Request): Promise<Response> {
   const now = d.now();
@@ -353,9 +380,13 @@ export function panelHandler(d: PanelDeps): (req: Request) => Promise<Response> 
     const path = url.pathname;
     // Só estas rotas escrevem. /api/selo/* e o token do selo nunca chegam aqui.
     const item = /^\/api\/itens\/([A-Z0-9]{10})(?:\/(alvo|pausa|silencio|linhas))?$/.exec(path);
-    if (!act || (path !== "/api/itens" && !item)) return json({ erro: "método não permitido" }, 405);
+    if (!act || (path !== "/api/itens" && path !== "/api/importar" && !item)) return json({ erro: "método não permitido" }, 405);
     try {
       checkSameOrigin(req, url);
+      if (path === "/api/importar") {
+        if (req.method !== "POST") return json({ erro: "método não permitido" }, 405);
+        return json(importItems(d.store, d.now(), await readBody(req)));
+      }
       if (path === "/api/itens") {
         if (req.method !== "POST") return json({ erro: "método não permitido" }, 405);
         return json(await addItems(d.store, act, d.now(), await readBody(req)));

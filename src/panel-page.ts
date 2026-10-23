@@ -49,12 +49,16 @@ function spark(pts,w,h){if(pts.length<2)return '<svg width="'+w+'" height="'+h+'
 async function lista(){const d=await get('/api/itens'),s=d.saude;
  let h='<div class="saude"><b class="'+s.status+'">'+ST[s.status]+'</b> · última rodada '+ago(s.ultimaRodada)+' (a cada '+s.intervaloMin+' min) · '+s.itens+' itens'+(s.pausados?', '+s.pausados+' pausados':'')+(s.comFalhas?', <span style="color:var(--bad)">'+s.comFalhas+' com falha</span>':'')+'</div>';
  EDIT=!!d.edicao;
- if(EDIT)h+='<div class="card"><h3>Rastrear produtos</h3><textarea id="txt" rows="3" maxlength="4000" placeholder="Cole um ou mais links da Amazon (um por linha, até 20)"></textarea><button class="btn pri" id="add">Rastrear</button><div id="res">'+ult+'</div></div>';
+ if(EDIT)h+='<div class="card"><h3>Rastrear produtos</h3><textarea id="txt" rows="3" maxlength="4000" placeholder="Cole um ou mais links da Amazon (um por linha, até 20)"></textarea><button class="btn pri" id="add">Rastrear</button><div id="res">'+ult+'</div></div><div class="card"><h3>Importar do Keepa</h3><div class="mut">Em keepa.com/manage use o botão de exportar (CSV) e escolha o arquivo aqui. Só ASINs; o alvo você define depois.</div><input type="file" id="arq" accept=".csv,.txt,text/csv,text/plain"><div id="imp"></div></div>';
  for(const i of d.itens){const l=i.linhas;
   h+='<div class="item" data-asin="'+esc(i.asin)+'"><div class="t"><div>'+i.num+'. '+esc(i.titulo||i.asin)+(i.pausado?' (pausado)':'')+(i.silenciadoAte?' (alertas silenciados)':'')+'</div><div class="mut">Amazon <span class="preco">'+(l.amazon.atual!=null?brl(l.amazon.atual):'não vende agora')+'</span>'+(l.terceiros.ligada?' · Terceiros <span class="preco">'+brl(l.terceiros.atual)+'</span>':'')+(l.usado.ligada?' · Usado <span class="preco">'+brl(l.usado.atual)+'</span>':'')+(l.amazon.alvo!=null?' · alvo '+brl(l.amazon.alvo):'')+'</div></div>'+spark(i.mini,110,32)+'</div>'}
  if(!d.itens.length)h+='<p class="mut">Nenhum item rastreado. Cole um link da Amazon acima ou no bot do Telegram.</p>';
  v.innerHTML=h;v.querySelectorAll('.item').forEach(e=>e.onclick=()=>detalhe(e.dataset.asin,14));
- if(EDIT){$('#add').onclick=e=>rodar(e.target,adicionar);bindPickers(v)}}
+ if(EDIT){$('#add').onclick=e=>rodar(e.target,adicionar);$('#arq').onchange=e=>rodar(null,()=>importar(e.target));bindPickers(v)}}
+async function importar(inp){const f=inp.files[0];if(!f)return;if(f.size>6000)throw new Error('Arquivo grande demais (máx. ~500 ASINs).');
+ const r=await api('POST','/api/importar',{texto:await f.text()});inp.value='';
+ let t=r.importados+' importados';if(r.duplicados)t+=', '+r.duplicados+' já rastreados/repetidos';if(r.invalidos)t+=', '+r.invalidos+' inválidos';if(r.outrosPaises)t+=', '+r.outrosPaises+' de outros países ignorados';if(r.acimaDoLimite)t+=', '+r.acimaDoLimite+' acima do limite de 200 (importe de novo depois)';
+ ult='<div class="row">Importação: '+esc(t)+'. Os preços aparecem nas próximas rodadas.</div>';await lista()}
 function tokens(t){const out=[];for(let x of t.split(/\\s+/)){if(!x)continue;if(/^(amzn\\.to|a\\.co)\\//i.test(x))x='https:'+'//'+x;if(/^https?:\\/\\//i.test(x)&&!out.includes(x))out.push(x)}return out}
 async function adicionar(){const ls=tokens($('#txt').value);if(!ls.length)throw new Error('Cole pelo menos um link da Amazon.');
  const lim=ls.slice(0,20),res=[];let h='';

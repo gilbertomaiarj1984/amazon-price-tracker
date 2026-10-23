@@ -323,3 +323,30 @@ describe("config: PANEL_READONLY", () => {
   test("escrita ligada por padrão", () => expect(loadConfig(base).panelReadonly).toBe(false));
   test("PANEL_READONLY=1 desliga", () => expect(loadConfig({ ...base, PANEL_READONLY: "1" }).panelReadonly).toBe(true));
 });
+
+describe("importar do Keepa", () => {
+  const post = (body: unknown) =>
+    handle(new Request("http://x/api/importar", { method: "POST", headers: { origin: "http://x", "x-painel": "1", "content-type": "application/json" }, body: JSON.stringify(body) }));
+  beforeEach(() => {
+    handle = panelHandler({ store, now: () => NOW, intervalMin: 30, collect: async () => ({ ok: false, kind: "http_error", falhasProduto: 1, avisarProduto: false }), resolve: async () => ({ ok: false, motivo: "sem_link" }) });
+  });
+  test("CSV do Keepa: BOM, aspas, ASIN numérico, duplicado e existente", async () => {
+    const texto = '﻿"ASIN"\n"B0BVZS2T4Z"\n"6559283135"\n"B0BVZS2T4Z"\n"B097BYXGXN"\n"curto"\n';
+    const r = await post({ texto });
+    expect(await r.json()).toEqual({ importados: 2, duplicados: 2, invalidos: 1, outrosPaises: 0, acimaDoLimite: 0 });
+    expect(store.getByAsin("6559283135")?.titulo).toBeNull();
+  });
+  test("links: .com.br entra, outros países são ignorados", async () => {
+    const r = await post({ texto: "https://www.amazon.com.br/dp/B07GW4CM5F https://www.amazon.com/dp/B0193H5B90" });
+    expect(await r.json()).toMatchObject({ importados: 1, outrosPaises: 1 });
+  });
+  test("limite de 200 itens", async () => {
+    const texto = Array.from({ length: 205 }, (_, i) => `X${String(i).padStart(9, "0")}`).join("\n");
+    expect(await (await post({ texto })).json()).toMatchObject({ importados: 200, acimaDoLimite: 5 });
+  });
+  test("vazio e somente leitura", async () => {
+    expect((await post({ texto: '"ASIN"' })).status).toBe(400);
+    handle = panelHandler({ store, now: () => NOW, intervalMin: 30 });
+    expect((await post({ texto: "B07GW4CM5F" })).status).toBe(405);
+  });
+});
