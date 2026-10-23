@@ -309,10 +309,15 @@ function soltarEmItem(src,dst){const a=S.itens.find(i=>i.asin===src),b=S.itens.f
  if(a.grupoId!=null)return rodar(null,()=>colocar(b.asin,a.grupoId,'Item colocado em '+gnome(a.grupoId)+'.'));
  const n=(prompt('Nome do grupo para estes 2 itens (sugestão pelos títulos, pode editar):',sugerirNome([a,b]))||'').trim();if(!n)return;
  rodar(null,async()=>{const g=await api('POST','/api/grupos',{nome:n});await api('PUT','/api/itens/'+a.asin+'/grupo',{grupoId:g.id});await colocar(b.asin,g.id,'Grupo criado com 2 itens.');abrirGrupo(g.id)})}
+/* rola a página sozinha quando o item arrastado chega perto da borda de cima ou de baixo da janela */
+let dragY=null,dragTm=null;
+document.addEventListener('dragover',e=>{dragY=e.clientY});
+function autoRolar(on){clearInterval(dragTm);dragTm=null;if(!on)return;dragY=null;
+ dragTm=setInterval(()=>{if(!S.drag){autoRolar(false);return}if(dragY==null)return;const z=90,h=innerHeight,v=dragY<z?-Math.ceil((z-dragY)/4)-2:dragY>h-z?Math.ceil((dragY-(h-z))/4)+2:0;if(v)scrollBy(0,v)},16)}
 function ligarDrag(){const alvo=(el,fn)=>{el.ondragover=e=>{if(!S.drag)return;e.preventDefault();el.classList.add('over')};el.ondragleave=()=>el.classList.remove('over');
   el.ondrop=e=>{e.preventDefault();el.classList.remove('over');const src=S.drag;S.drag=null;if(src)fn(src)}};
- $('#lst').querySelectorAll('[data-dr]').forEach(el=>{el.ondragstart=e=>{S.drag=el.dataset.dr;el.classList.add('drag');try{e.dataTransfer.setData('text/plain',S.drag);e.dataTransfer.effectAllowed='move'}catch(x){}};
-  el.ondragend=()=>{S.drag=null;el.classList.remove('drag');document.querySelectorAll('.over').forEach(o=>o.classList.remove('over'))};
+ $('#lst').querySelectorAll('[data-dr]').forEach(el=>{el.ondragstart=e=>{S.drag=el.dataset.dr;autoRolar(true);el.classList.add('drag');try{e.dataTransfer.setData('text/plain',S.drag);e.dataTransfer.effectAllowed='move'}catch(x){}};
+  el.ondragend=()=>{S.drag=null;autoRolar(false);el.classList.remove('drag');document.querySelectorAll('.over').forEach(o=>o.classList.remove('over'))};
   alvo(el,src=>soltarEmItem(src,el.dataset.dr))});
  $('#lst').querySelectorAll('[data-dg]').forEach(b=>alvo(b,src=>{const it=S.itens.find(i=>i.asin===src);if(it&&it.grupoId!==Number(b.dataset.dg))rodar(null,()=>colocar(src,Number(b.dataset.dg),'Item colocado no grupo.'))}));
  $('#esq').querySelectorAll('[data-g]').forEach(b=>alvo(b,src=>{const g=b.dataset.g;if(g==='none'){const it=S.itens.find(i=>i.asin===src);if(it&&it.grupoId!=null)rodar(null,()=>colocar(src,null,'Item fora de grupos.'))}else rodar(null,()=>colocar(src,Number(g),'Item colocado no grupo.'))}))}
