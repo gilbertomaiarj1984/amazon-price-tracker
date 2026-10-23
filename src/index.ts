@@ -113,6 +113,7 @@ if (cfg.panel) {
     maxRequestBodySize: MAX_BODY,
     fetch: panelHandler({
       token: cfg.panelToken,
+      usToken: cfg.userscriptToken,
       store,
       now: () => new Date(),
       intervalMin: cfg.intervalMin,

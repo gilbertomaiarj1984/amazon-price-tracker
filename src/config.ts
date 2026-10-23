@@ -9,6 +9,8 @@ export interface Config {
   panel: { host: string; port: number } | null;
   /** Token do selo do userscript (GET /api/selo/ASIN). Sem PANEL_TOKEN, o endpoint fica desligado. */
   panelToken: string | null;
+  /** Token da API do userscript (/api/us/*: ver item, definir alvo, rastrear). Sem USERSCRIPT_TOKEN, desligada. */
+  userscriptToken: string | null;
   /** PANEL_READONLY=1 desliga as ações de escrita do painel (cadastrar, alvo, pausar, linhas, remover). */
   panelReadonly: boolean;
   /** Varredura diária de equivalentes vendidos pela Amazon (SUGESTOES=0 desliga). */
@@ -30,6 +32,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   if (!chat || !/^-?\d+$/.test(chat)) throw new Error("Defina TELEGRAM_CHAT_ID (número) no .env");
   const panelToken = env["PANEL_TOKEN"]?.trim();
   if (panelToken && panelToken.length < 24) throw new Error("PANEL_TOKEN curto demais: use pelo menos 24 caracteres (openssl rand -hex 24)");
+  const usToken = env["USERSCRIPT_TOKEN"]?.trim();
+  if (usToken && usToken.length < 24) throw new Error("USERSCRIPT_TOKEN curto demais: use pelo menos 24 caracteres (openssl rand -hex 24)");
+  if (usToken && usToken === panelToken) throw new Error("USERSCRIPT_TOKEN deve ser diferente do PANEL_TOKEN");
   const reqMinMs = intOf(env, "REQ_MIN_MS", 2000, 500);
   const reqMaxMs = intOf(env, "REQ_MAX_MS", 5000, reqMinMs);
   const pausaMinMs = intOf(env, "SUGESTOES_PAUSA_MIN_MS", 15_000, 2000);
@@ -50,6 +55,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     reqMinMs,
     reqMaxMs,
     panelReadonly: /^(1|true|sim)$/i.test(env["PANEL_READONLY"]?.trim() ?? ""),
+    userscriptToken: usToken || null,
     panelToken: env["PANEL_TOKEN"]?.trim() || null,
     panel: env["PANEL_PORT"]?.trim() ? { host: env["PANEL_HOST"]?.trim() || "127.0.0.1", port: intOf(env, "PANEL_PORT", 0, 1) } : null,
   };

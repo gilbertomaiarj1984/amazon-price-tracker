@@ -66,6 +66,68 @@ curl -s -w '\n%{http_code}\n' -H "x-selo-token: SEU_TOKEN" https://precos.143-95
 
 Abra de novo o link bruto do script (seção Instalar) e clique em **Atualizar**. Na página de um produto, Tampermonkey (ícone) > *Rastreador de preços* > **Definir token do selo de histórico**, cole o token e recarregue a página. O token fica só no armazenamento do Tampermonkey. Para revogar: troque o `PANEL_TOKEN` no `.env` e rode `docker compose up -d`.
 
+## Alvo e detalhes na janela (v3)
+
+Com um segundo token (`USERSCRIPT_TOKEN`) a janela da página do produto passa a mostrar o mesmo que o painel e deixa **definir o alvo** e **rastrear** o item sem sair da Amazon:
+
+- borda e título coloridos pelo alvo (verde: dentro; laranja: até 20% acima; vermelho: mais de 20% acima), estrela, grupo e número do item;
+- preço por linha (Amazon, Terceiros e Usado, só as ligadas), gráfico de 30 dias, mínimo, máximo e média;
+- "atualizado há N min" (última coleta);
+- campo **Alvo R$** com *Salvar* (Enter também salva) e *Remover alvo*; item não rastreado ganha o botão **Rastrear este produto**.
+
+### Como a escrita foi protegida
+
+O Caddy exige senha em tudo, e o Tampermonkey não envia essa senha; por isso `/api/us/*` precisa ficar fora do basic auth. Para isso não virar uma porta aberta:
+
+- **Token próprio**: `USERSCRIPT_TOKEN` (24+ caracteres), diferente do `PANEL_TOKEN` do selo e da senha do painel. O app recusa iniciar se forem iguais. Sem o token no `.env`, `/api/us/*` responde 404.
+- **Só 3 operações**: `GET /api/us/ASIN` (ver), `PUT /api/us/ASIN/alvo` (alvo) e `POST /api/us/ASIN/rastrear` (cadastrar). Não dá para pausar, remover, mexer em grupos nem importar.
+- **Sem CORS**: a API não envia nenhum cabeçalho `Access-Control-*`; uma página web comum não consegue chamá-la. O Tampermonkey usa `GM_xmlhttpRequest`, que não depende de CORS. Escritas ainda exigem `Content-Type: application/json` e o cabeçalho `x-us: 1`.
+- **Limites**: 10 tokens errados por minuto (depois, 429 para todos por um minuto), 30 escritas por minuto e 10 cadastros a cada 10 minutos (cada cadastro lê a Amazon).
+- **Revogação**: troque o `USERSCRIPT_TOKEN` no `.env` e rode `docker compose up -d`. `PANEL_READONLY=1` também bloqueia a escrita (a janela só mostra).
+- O token fica só no armazenamento do Tampermonkey; nunca cole no chat.
+
+### Passo a passo
+
+**1. VPS (usuário `deploy`): gerar o token e subir**
+
+```sh
+cd ~/price-tracker-spike/amazon-price-tracker
+git pull --ff-only
+TOKEN=$(openssl rand -hex 24); echo "USERSCRIPT_TOKEN=$TOKEN" >> .env; echo "$TOKEN"   # copie o token impresso
+chmod 600 .env
+docker compose up -d --build
+docker compose logs --tail 5 tracker
+```
+
+**2. Caddy (você edita; a thread não mexe no Caddyfile).** No bloco `precos.143-95-214-240.sslip.io` de `/home/deploy/garimpo/Caddyfile`, troque a linha `@selo path /api/selo/*` por:
+
+```caddyfile
+        @selo path /api/selo/* /api/us/*
+```
+
+(o resto do bloco continua igual). Depois:
+
+```sh
+docker exec garimpo-caddy-1 caddy validate --config /etc/caddy/Caddyfile
+docker exec garimpo-caddy-1 caddy reload --config /etc/caddy/Caddyfile
+```
+
+Testes (401, 401 e 200 ou 404; troque SEU_TOKEN):
+
+```sh
+curl -s -o /dev/null -w '%{http_code}\n' https://precos.143-95-214-240.sslip.io/api/itens
+curl -s -o /dev/null -w '%{http_code}\n' https://precos.143-95-214-240.sslip.io/api/us/B097BYXGXN
+curl -s -w '\n%{http_code}\n' -H "x-us-token: SEU_TOKEN" https://precos.143-95-214-240.sslip.io/api/us/B097BYXGXN
+```
+
+**3. Tampermonkey**
+
+1. Abra o link bruto do script (seção Instalar) e clique em **Atualizar** (versão 3.0.0).
+2. Abra uma página de produto da Amazon, clique no ícone do Tampermonkey > *Rastreador de preços* > **Definir token do rastreador (alvo e detalhes)**, cole o `USERSCRIPT_TOKEN` e recarregue a página.
+3. Na janela, digite o alvo (ex.: `149,90`) e clique em **Salvar**.
+
+Sem o token do rastreador, o script continua funcionando como antes (selo somente leitura ou copiar link).
+
 ## Atualizar o bot no VPS (necessário para colar vários links)
 
 ```sh
