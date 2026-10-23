@@ -18,6 +18,7 @@ export interface BotDeps {
 }
 
 const AWAITING = "awaiting_target";
+const MAX_BATCH = 20;
 const MUTE_MS = 24 * 3_600_000;
 
 export const muteKey = (id: number): string => `mute:${id}`;
@@ -66,7 +67,8 @@ export class Bot {
     }
     if (/https?:\/\//i.test(text) || /\b(amzn\.to|a\.co)\//i.test(text)) {
       this.store.setMeta(AWAITING, null);
-      return this.addLink(text);
+      const links = [...new Set(text.match(/https?:\/\/[^\s<>"']+/gi) ?? [])];
+      return links.length > 1 ? this.addMany(links) : this.addLink(text);
     }
     const aw = this.store.getMeta(AWAITING);
     if (aw) {
@@ -164,6 +166,44 @@ export class Bot {
     const view = this.view(fresh);
     await this.d.send(fmt.card(view));
     return this.askTarget(fresh, view.linhas.amazon.atual);
+  }
+
+  /** Vários links de uma vez (ex.: do userscript na busca). Cadastra sem perguntar alvo e resume no fim. */
+  private async addMany(links: string[]): Promise<void> {
+    const list = links.slice(0, MAX_BATCH);
+    await this.d.send(`Cadastrando ${list.length} links…`);
+    const lines: string[] = [];
+    let novos = 0;
+    for (const link of list) {
+      const r = await this.d.resolve(link);
+      if (!r.ok) {
+        lines.push(`✗ ${fmt.esc(link.slice(0, 60))}: ${RESOLVE_ERRORS[r.motivo] ?? "link inválido"}`);
+        continue;
+      }
+      const existing = this.store.getByAsin(r.asin);
+      if (existing) {
+        lines.push(`• já rastreado: #${this.store.numberOf(existing.id)} ${fmt.esc(existing.titulo ?? existing.asin)}`);
+        continue;
+      }
+      const p = this.store.addProduct(r.asin, null, this.d.now().toISOString());
+      let ok = false;
+      try {
+        const o = await this.d.collect(p);
+        ok = o.ok;
+      } catch {
+        ok = false;
+      }
+      if (!ok) {
+        this.store.remove(p.id);
+        lines.push(`✗ ${r.asin}: não consegui ler a página agora`);
+        continue;
+      }
+      novos++;
+      const fresh = this.store.getById(p.id)!;
+      lines.push(`✓ #${this.store.numberOf(fresh.id)} ${fmt.esc(fresh.titulo ?? fresh.asin)}`);
+    }
+    if (links.length > list.length) lines.push(`Só os primeiros ${MAX_BATCH} links foram usados.`);
+    await this.d.send(`<b>${novos} novo(s) item(ns).</b>\n${lines.join("\n")}\n\nDefina alvos com <code>/alvo N valor</code>.`);
   }
 
   private async askTarget(p: Product, preco: number | null): Promise<void> {

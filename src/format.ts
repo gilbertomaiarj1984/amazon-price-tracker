@@ -116,7 +116,7 @@ export const HELP = `<b>Comandos</b>
 <code>/pausar N</code>  pausa ou retoma
 <code>/remover N</code>  apaga o item e o histórico
 
-Para rastrear, cole o link do produto.`;
+Para rastrear, cole o link do produto (ou vários, um por linha, até 20).`;
 
 export const lineKeyFrom = (s: string | undefined): LineKey | null => {
   const t = (s ?? "").toLowerCase();
