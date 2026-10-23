@@ -1,6 +1,28 @@
 # Painel web
 
-Painel somente leitura com a lista de itens (mini-gráfico), histórico de 7/14/30 dias (linhas Amazon, Terceiros e Usado, com faixa cinza quando a Amazon não vendeu), tabela de ofertas da última coleta e a saúde das coletas. Lê o mesmo SQLite do bot. Não faz login na Amazon, não altera nada e aceita só `GET`.
+Painel com tudo o que o bot do Telegram faz, mais a leitura: lista de itens (mini-gráfico), histórico de 7/14/30 dias (linhas Amazon, Terceiros e Usado, com faixa cinza quando a Amazon não vendeu), tabela de ofertas da última coleta e a saúde das coletas. Lê e altera o mesmo SQLite do bot. Não faz login na Amazon.
+
+## O que dá para fazer no site (equivale ao bot)
+
+| No Telegram | No painel |
+|---|---|
+| colar um link (ou vários, até 20) | caixa **Rastrear produtos** na lista; sugere alvo −5/−10/−15% ou valor livre |
+| `/lista` | a própria lista, com preço atual, alvo e mini-gráfico |
+| `/historico N` | clicar no item: gráfico de 7/14/30 dias, mínimo, máximo, variação |
+| `/linhas N` | **Linhas de preço**: ligar/desligar Terceiros e Usado (lê o produto na hora) |
+| `/alvo N valor` | **Preço-alvo** por linha, com campo para salvar e botão para remover |
+| `/pausar N` | **Pausar/Retomar coletas** |
+| `/remover N` | **Remover item** (pede confirmação) |
+| botão "Silenciar 24 h" | **Silenciar alertas por 24 h** / reativar |
+
+Os avisos de queda de preço continuam chegando só no Telegram.
+
+### Segurança das ações
+
+- Escrita só em `POST /api/itens` e `PUT`/`DELETE /api/itens/ASIN[/alvo|pausa|silencio|linhas]`. Exige `Origin` igual ao host do painel, `Content-Type: application/json` e o cabeçalho `x-painel: 1` (um site de fora não consegue enviar isso: bloqueia CSRF). Corpo máximo de 8 KB, valores validados (alvo entre 0,01 e 1.000.000, links só da amazon.com.br).
+- `/api/selo/*` segue só leitura e o token do selo não dá acesso a nenhuma rota de escrita.
+- O login (basic auth) é do Caddy. Containers da rede `proxy` alcançam o painel sem login, como já era na leitura; se isso for um risco, ligue `PANEL_READONLY=1`.
+- Para voltar ao painel só de leitura: `echo 'PANEL_READONLY=1' >> .env && docker compose up -d`.
 
 ## Como está publicado
 

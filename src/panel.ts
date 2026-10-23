@@ -1,4 +1,8 @@
+import { Actions, MAX_BATCH, RESOLVE_ERRORS, extractLinks, mutedUntil } from "./actions.ts";
+import type { ActionDeps } from "./actions.ts";
+import { productUrl } from "./amazon/fetch.ts";
 import type { Product, Store } from "./db.ts";
+import { parseUserNumber } from "./numbers.ts";
 import { PANEL_HTML } from "./panel-page.ts";
 import { DAY_MS, buildView } from "./view.ts";
 import { timingSafeEqual } from "node:crypto";
@@ -18,6 +22,8 @@ export interface PanelItem {
   titulo: string | null;
   pausado: boolean;
   falhasSeguidas: number;
+  silenciadoAte: string | null;
+  url: string;
   linhas: ReturnType<typeof buildView>["linhas"];
   /** Preço da Amazon (ou da linha mais barata ligada) nos últimos 7 dias, para o mini-gráfico. */
   mini: Array<{ t: string; v: number }>;
@@ -65,7 +71,7 @@ export function panelItems(store: Store, now: Date): PanelItem[] {
         "SELECT coletado_em AS t, preco AS v FROM price_lines WHERE product_id = ? AND linha = ? AND coletado_em >= ? ORDER BY coletado_em",
       )
       .all(p.id, v.linhas.amazon.atual != null || v.linhas.amazon.coletas > 0 ? "amazon" : "terceiros", desde) as PanelItem["mini"];
-    return { num: v.num, asin: p.asin, titulo: p.titulo, pausado: p.pausado, falhasSeguidas: p.falhasSeguidas, linhas: v.linhas, mini: rows };
+    return { num: v.num, asin: p.asin, titulo: p.titulo, pausado: p.pausado, falhasSeguidas: p.falhasSeguidas, silenciadoAte: mutedUntil(store, p.id, now), url: productUrl(p.asin), linhas: v.linhas, mini: rows };
   });
 }
 
@@ -117,6 +123,8 @@ export function panelDetail(store: Store, p: Product, now: Date, days: number) {
     asin: p.asin,
     titulo: p.titulo,
     pausado: p.pausado,
+    silenciadoAte: mutedUntil(store, p.id, now),
+    url: productUrl(p.asin),
     dias: days,
     desde,
     linhas: view.linhas,
@@ -188,41 +196,181 @@ function tokenOk(given: string | null, expected: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-export interface PanelDeps {
+export interface PanelDeps extends Partial<Pick<ActionDeps, "collect" | "resolve">> {
   /** Token do endpoint /api/selo; sem ele a rota responde 404. */
   token?: string | null;
   store: Store;
   now: () => Date;
   intervalMin: number;
+  /** Sem `collect` e `resolve` (ou com `somenteLeitura`), o painel só aceita GET. */
+  somenteLeitura?: boolean;
 }
 
-/** Painel somente leitura: só GET, nenhum dado de configuração (token, chat) passa por aqui. */
-export function panelHandler(d: PanelDeps): (req: Request) => Response {
-  return (req) => {
-    if (req.method !== "GET" && req.method !== "HEAD") return json({ erro: "método não permitido" }, 405);
+export const MAX_BODY = 8 * 1024;
+const MAX_ALVO = 1_000_000;
+
+class HttpError extends Error {
+  constructor(
+    readonly status: number,
+    msg: string,
+  ) {
+    super(msg);
+  }
+}
+
+/** Defesa contra CSRF: só aceita escrita feita pela própria página (mesma origem, JSON, cabeçalho próprio). */
+function checkSameOrigin(req: Request, url: URL): void {
+  const origin = req.headers.get("origin");
+  let ok = false;
+  try {
+    ok = origin != null && new URL(origin).host === url.host;
+  } catch {
+    ok = false;
+  }
+  const site = req.headers.get("sec-fetch-site");
+  if (!ok || (site != null && site !== "same-origin")) throw new HttpError(403, "origem não permitida");
+  if (req.headers.get("x-painel") !== "1") throw new HttpError(403, "cabeçalho ausente");
+  if (!(req.headers.get("content-type") ?? "").toLowerCase().startsWith("application/json")) throw new HttpError(415, "use application/json");
+}
+
+async function readBody(req: Request): Promise<Record<string, unknown>> {
+  const len = Number(req.headers.get("content-length") ?? 0);
+  if (len > MAX_BODY) throw new HttpError(413, "corpo grande demais");
+  const raw = await req.text();
+  if (raw.length > MAX_BODY) throw new HttpError(413, "corpo grande demais");
+  let body: unknown;
+  try {
+    body = raw ? JSON.parse(raw) : {};
+  } catch {
+    throw new HttpError(400, "JSON inválido");
+  }
+  if (body == null || typeof body !== "object" || Array.isArray(body)) throw new HttpError(400, "corpo deve ser um objeto JSON");
+  return body as Record<string, unknown>;
+}
+
+const bool = (v: unknown, nome: string): boolean => {
+  if (typeof v !== "boolean") throw new HttpError(400, `${nome} deve ser true ou false`);
+  return v;
+};
+
+const lineOf = (v: unknown, aceita: readonly LineKey[]): LineKey => {
+  if (typeof v !== "string" || !(aceita as readonly string[]).includes(v)) throw new HttpError(400, `linha deve ser: ${aceita.join(", ")}`);
+  return v as LineKey;
+};
+
+function alvoOf(v: unknown): number | null {
+  if (v === null) return null;
+  const n = typeof v === "number" ? (Number.isFinite(v) && v > 0 ? v : null) : typeof v === "string" && v.length <= 20 ? parseUserNumber(v) : null;
+  if (n == null || n > MAX_ALVO) throw new HttpError(400, `valor deve ser um preço entre 0,01 e ${MAX_ALVO}`);
+  return Math.round(n * 100) / 100;
+}
+
+export interface AddItemResult {
+  link: string;
+  status: "novo" | "existente" | "erro";
+  erro?: string;
+  item?: { asin: string; titulo: string | null; num: number; amazonAtual: number | null };
+}
+
+async function addItems(store: Store, act: Actions, now: Date, body: Record<string, unknown>): Promise<{ resultados: AddItemResult[]; ignorados: number }> {
+  if (typeof body["texto"] !== "string" || body["texto"].length > 4000) throw new HttpError(400, "texto deve ser uma string de até 4000 caracteres com links");
+  const all = extractLinks(body["texto"]);
+  if (!all.length) throw new HttpError(400, RESOLVE_ERRORS["sem_link"]!);
+  const resultados: AddItemResult[] = [];
+  for (const link of all.slice(0, MAX_BATCH)) {
+    const r = await act.addLink(link);
+    const shown = link.slice(0, 80);
+    if (r.ok || (!r.ok && r.erro === "existente")) {
+      const p = r.ok ? r.product : (r as { product: Product }).product;
+      const v = buildView(store, p, now);
+      resultados.push({ link: shown, status: r.ok ? "novo" : "existente", item: { asin: p.asin, titulo: p.titulo, num: v.num, amazonAtual: v.linhas.amazon.atual } });
+    } else if (r.erro === "link") resultados.push({ link: shown, status: "erro", erro: RESOLVE_ERRORS[r.motivo] ?? "link inválido" });
+    else resultados.push({ link: shown, status: "erro", erro: `Não consegui ler a página agora${r.detalhe ? ` (${r.detalhe})` : ""}. Nada foi cadastrado.` });
+  }
+  return { resultados, ignorados: Math.max(0, all.length - MAX_BATCH) };
+}
+
+/** Rotas de escrita sobre um item (por ASIN). Devolvem o detalhe atualizado. */
+async function itemWrite(d: PanelDeps, act: Actions, method: string, p: Product, sub: string | undefined, req: Request): Promise<Response> {
+  const now = d.now();
+  const detail = () => json(panelDetail(d.store, d.store.getById(p.id)!, now, 14));
+  if (method === "DELETE" && !sub) {
+    act.remove(p);
+    return json({ removido: true });
+  }
+  if (method !== "PUT") return json({ erro: "método não permitido" }, 405);
+  const body = await readBody(req);
+  switch (sub) {
+    case "alvo": {
+      const linha = lineOf(body["linha"], LINE_KEYS);
+      const r = act.setAlvo(p, linha, alvoOf(body["valor"]));
+      if (!r.ok) return json({ erro: "Essa linha está desligada. Ligue a linha antes de definir o alvo." }, 409);
+      return json({ ...panelDetail(d.store, d.store.getById(p.id)!, now, 14), dentroDoAlvo: r.dentro });
+    }
+    case "pausa":
+      act.setPausa(p, bool(body["pausado"], "pausado"));
+      return detail();
+    case "silencio":
+      act.silenciar(p, bool(body["silenciado"], "silenciado"));
+      return detail();
+    case "linhas": {
+      const linha = lineOf(body["linha"], ["terceiros", "usado"]) as "terceiros" | "usado";
+      const on = bool(body["ligada"], "ligada");
+      act.setLinha(p, linha, on);
+      const lida = on ? await act.collectNow(p) : null;
+      return json({ ...panelDetail(d.store, d.store.getById(p.id)!, now, 14), leitura: lida ? (lida.ok ? "ok" : "falhou") : null });
+    }
+    default:
+      return json({ erro: "não encontrado" }, 404);
+  }
+}
+
+/** Painel: leitura por GET e, se `collect` e `resolve` existirem, as mesmas ações do bot por POST/PUT/DELETE. */
+export function panelHandler(d: PanelDeps): (req: Request) => Promise<Response> {
+  const act = d.collect && d.resolve && !d.somenteLeitura ? new Actions({ store: d.store, now: d.now, collect: d.collect, resolve: d.resolve }) : null;
+  const read = (req: Request): Response => {
     const url = new URL(req.url);
     const path = url.pathname;
-    let res: Response;
-    if (path === "/") res = new Response(PANEL_HTML, { headers: { "content-type": "text/html; charset=utf-8" } });
-    else if (path === "/api/itens") res = json({ saude: panelHealth(d.store, d.now(), d.intervalMin), itens: panelItems(d.store, d.now()) });
-    else if (path.startsWith("/api/selo/")) {
+    if (path === "/") return new Response(PANEL_HTML, { headers: { "content-type": "text/html; charset=utf-8" } });
+    if (path === "/api/itens") return json({ saude: panelHealth(d.store, d.now(), d.intervalMin), itens: panelItems(d.store, d.now()), edicao: act != null });
+    if (path.startsWith("/api/selo/")) {
       const m = /^\/api\/selo\/([A-Z0-9]{10})$/.exec(path);
-      if (!d.token) res = json({ erro: "não encontrado" }, 404);
-      else if (!tokenOk(req.headers.get("x-selo-token"), d.token)) res = json({ erro: "não autorizado" }, 401);
-      else {
-        const p = m ? d.store.getByAsin(m[1]!) : null;
-        res = p ? json(panelSelo(d.store, p, d.now())) : json({ rastreado: false }, 404);
-      }
-    } else if (path === "/api/saude") res = json(panelHealth(d.store, d.now(), d.intervalMin));
-    else {
-      const m = /^\/api\/itens\/([A-Z0-9]{10})$/.exec(path);
+      if (!d.token) return json({ erro: "não encontrado" }, 404);
+      if (!tokenOk(req.headers.get("x-selo-token"), d.token)) return json({ erro: "não autorizado" }, 401);
       const p = m ? d.store.getByAsin(m[1]!) : null;
-      if (!p) res = json({ erro: "não encontrado" }, 404);
-      else {
-        const days = Number(url.searchParams.get("dias") ?? 14);
-        res = (PANEL_DAYS as readonly number[]).includes(days) ? json(panelDetail(d.store, p, d.now(), days)) : json({ erro: "dias deve ser 7, 14 ou 30" }, 400);
-      }
+      return p ? json(panelSelo(d.store, p, d.now())) : json({ rastreado: false }, 404);
     }
+    if (path === "/api/saude") return json(panelHealth(d.store, d.now(), d.intervalMin));
+    const m = /^\/api\/itens\/([A-Z0-9]{10})$/.exec(path);
+    const p = m ? d.store.getByAsin(m[1]!) : null;
+    if (!p) return json({ erro: "não encontrado" }, 404);
+    const days = Number(url.searchParams.get("dias") ?? 14);
+    return (PANEL_DAYS as readonly number[]).includes(days) ? json(panelDetail(d.store, p, d.now(), days)) : json({ erro: "dias deve ser 7, 14 ou 30" }, 400);
+  };
+
+  const write = async (req: Request): Promise<Response> => {
+    const url = new URL(req.url);
+    const path = url.pathname;
+    // Só estas rotas escrevem. /api/selo/* e o token do selo nunca chegam aqui.
+    const item = /^\/api\/itens\/([A-Z0-9]{10})(?:\/(alvo|pausa|silencio|linhas))?$/.exec(path);
+    if (!act || (path !== "/api/itens" && !item)) return json({ erro: "método não permitido" }, 405);
+    try {
+      checkSameOrigin(req, url);
+      if (path === "/api/itens") {
+        if (req.method !== "POST") return json({ erro: "método não permitido" }, 405);
+        return json(await addItems(d.store, act, d.now(), await readBody(req)));
+      }
+      const p = d.store.getByAsin(item![1]!);
+      if (!p) return json({ erro: "não encontrado" }, 404);
+      return await itemWrite(d, act, req.method, p, item![2], req);
+    } catch (e) {
+      if (e instanceof HttpError) return json({ erro: e.message }, e.status);
+      throw e;
+    }
+  };
+
+  return async (req) => {
+    const res = req.method === "GET" || req.method === "HEAD" ? read(req) : await write(req).catch(() => json({ erro: "erro interno" }, 500));
     for (const [k, v] of Object.entries(SECURITY)) res.headers.set(k, v);
     return res;
   };

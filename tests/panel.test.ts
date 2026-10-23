@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, test } from "bun:test";
+import { resolveAsin } from "../src/amazon/asin.ts";
+import { collectOne } from "../src/collector.ts";
 import { loadConfig } from "../src/config.ts";
 import { Store } from "../src/db.ts";
 import { amazonGaps, downsample, panelHandler } from "../src/panel.ts";
+import { fakeNet } from "./helpers.ts";
 
 const NOW = new Date("2026-10-23T15:00:00.000Z");
 let store: Store;
-let handle: (r: Request) => Response;
+let handle: (r: Request) => Promise<Response>;
 const get = (path: string, method = "GET") => handle(new Request(`http://x${path}`, { method }));
 
 beforeEach(() => {
@@ -24,23 +27,23 @@ beforeEach(() => {
 });
 
 describe("amazonGaps", () => {
-  test("faixa entre a última coleta com Amazon e a próxima", () => {
+  test("faixa entre a última coleta com Amazon e a próxima", async () => {
     expect(amazonGaps(["a", "b", "c", "d"], new Set(["a", "d"]))).toEqual([{ de: "a", ate: "d" }]);
   });
-  test("faixa aberta no fim termina na última coleta", () => {
+  test("faixa aberta no fim termina na última coleta", async () => {
     expect(amazonGaps(["a", "b", "c"], new Set(["a"]))).toEqual([{ de: "a", ate: "c" }]);
   });
-  test("sem Amazon desde o início", () => {
+  test("sem Amazon desde o início", async () => {
     expect(amazonGaps(["a", "b"], new Set())).toEqual([{ de: "a", ate: "b" }]);
   });
-  test("sem buraco, sem faixa", () => {
+  test("sem buraco, sem faixa", async () => {
     expect(amazonGaps(["a", "b"], new Set(["a", "b"]))).toEqual([]);
   });
 });
 
 describe("painel", () => {
   test("lista itens com saúde em dia", async () => {
-    const r = get("/api/itens");
+    const r = await get("/api/itens");
     expect(r.status).toBe(200);
     const j = (await r.json()) as any;
     expect(j.saude.status).toBe("ok");
@@ -51,15 +54,15 @@ describe("painel", () => {
 
   test("saúde: atrasado, sem rodada e falhando", async () => {
     store.setMeta("last_cycle_at", String(NOW.getTime() - 3 * 3600_000));
-    expect(((await get("/api/saude").json()) as any).status).toBe("atrasado");
+    expect(((await (await get("/api/saude")).json()) as any).status).toBe("atrasado");
     store.setMeta("last_cycle_at", null);
-    expect(((await get("/api/saude").json()) as any).status).toBe("sem_rodada");
+    expect(((await (await get("/api/saude")).json()) as any).status).toBe("sem_rodada");
     store.setMeta("cycle_fails", "2");
-    expect(((await get("/api/saude").json()) as any).status).toBe("falhando");
+    expect(((await (await get("/api/saude")).json()) as any).status).toBe("falhando");
   });
 
   test("detalhe: séries, faixa sem Amazon e ofertas da última coleta", async () => {
-    const j = (await get("/api/itens/B097BYXGXN?dias=7").json()) as any;
+    const j = (await (await get("/api/itens/B097BYXGXN?dias=7")).json()) as any;
     expect(j.series.amazon.length).toBe(2);
     expect(j.series.terceiros.length).toBe(4);
     expect(j.semAmazon).toEqual([{ de: "2026-10-23T12:00:00.000Z", ate: "2026-10-23T14:30:00.000Z" }]);
@@ -68,40 +71,40 @@ describe("painel", () => {
 
   test("janela de dias respeitada", async () => {
     store.saveSnapshot(1, "2026-10-10T00:00:00.000Z", [], { amazon: { linha: "amazon", preco: 20, vendedor: "Amazon" } });
-    expect(((await get("/api/itens/B097BYXGXN?dias=7").json()) as any).series.amazon.length).toBe(2);
-    expect(((await get("/api/itens/B097BYXGXN?dias=30").json()) as any).series.amazon.length).toBe(3);
+    expect(((await (await get("/api/itens/B097BYXGXN?dias=7")).json()) as any).series.amazon.length).toBe(2);
+    expect(((await (await get("/api/itens/B097BYXGXN?dias=30")).json()) as any).series.amazon.length).toBe(3);
   });
 
-  test("entradas inválidas", () => {
-    expect(get("/api/itens/B097BYXGXN?dias=5").status).toBe(400);
-    expect(get("/api/itens/NAOEXISTE1").status).toBe(404);
-    expect(get("/api/itens/x'%20OR%201=1").status).toBe(404);
-    expect(get("/nada").status).toBe(404);
+  test("entradas inválidas", async () => {
+    expect((await get("/api/itens/B097BYXGXN?dias=5")).status).toBe(400);
+    expect((await get("/api/itens/NAOEXISTE1")).status).toBe(404);
+    expect((await get("/api/itens/x'%20OR%201=1")).status).toBe(404);
+    expect((await get("/nada")).status).toBe(404);
   });
 
-  test("somente leitura", () => {
-    for (const m of ["POST", "PUT", "DELETE"]) expect(get("/api/itens", m).status).toBe(405);
+  test("somente leitura", async () => {
+    for (const m of ["POST", "PUT", "DELETE"]) expect((await get("/api/itens", m)).status).toBe(405);
   });
 
   test("página com cabeçalhos de segurança e sem recursos externos", async () => {
-    const r = get("/");
+    const r = await get("/");
     expect(r.headers.get("content-security-policy")).toContain("default-src 'none'");
     const html = await r.text();
     expect(html).not.toMatch(/https?:\/\//);
   });
 
   test("não vaza token nem chat", async () => {
-    const txt = await get("/api/itens").text();
+    const txt = await (await get("/api/itens")).text();
     expect(txt).not.toContain("TELEGRAM");
   });
 });
 
 describe("config do painel", () => {
   const base = { TELEGRAM_BOT_TOKEN: "t", TELEGRAM_CHAT_ID: "1" };
-  test("desligado por padrão", () => expect(loadConfig(base).panel).toBeNull());
-  test("loopback por padrão quando ligado", () => expect(loadConfig({ ...base, PANEL_PORT: "8787" }).panel).toEqual({ host: "127.0.0.1", port: 8787 }));
-  test("host explícito", () => expect(loadConfig({ ...base, PANEL_PORT: "8787", PANEL_HOST: "0.0.0.0" }).panel?.host).toBe("0.0.0.0"));
-  test("porta inválida", () => expect(() => loadConfig({ ...base, PANEL_PORT: "abc" })).toThrow());
+  test("desligado por padrão", async () => expect(loadConfig(base).panel).toBeNull());
+  test("loopback por padrão quando ligado", async () => expect(loadConfig({ ...base, PANEL_PORT: "8787" }).panel).toEqual({ host: "127.0.0.1", port: 8787 }));
+  test("host explícito", async () => expect(loadConfig({ ...base, PANEL_PORT: "8787", PANEL_HOST: "0.0.0.0" }).panel?.host).toBe("0.0.0.0"));
+  test("porta inválida", async () => expect(() => loadConfig({ ...base, PANEL_PORT: "abc" })).toThrow());
 });
 
 describe("selo do userscript", () => {
@@ -112,29 +115,29 @@ describe("selo do userscript", () => {
     handle = panelHandler({ store, now: () => NOW, intervalMin: 30, token: TOKEN });
   });
 
-  test("sem token configurado a rota não existe", () => {
+  test("sem token configurado a rota não existe", async () => {
     handle = panelHandler({ store, now: () => NOW, intervalMin: 30 });
-    expect(sel("/api/selo/B097BYXGXN", TOKEN).status).toBe(404);
+    expect((await sel("/api/selo/B097BYXGXN", TOKEN)).status).toBe(404);
   });
-  test("exige o token certo", () => {
-    expect(sel("/api/selo/B097BYXGXN").status).toBe(401);
-    expect(sel("/api/selo/B097BYXGXN", "errado").status).toBe(401);
-    expect(sel("/api/selo/B097BYXGXN?t=" + TOKEN).status).toBe(401);
+  test("exige o token certo", async () => {
+    expect((await sel("/api/selo/B097BYXGXN")).status).toBe(401);
+    expect((await sel("/api/selo/B097BYXGXN", "errado")).status).toBe(401);
+    expect((await sel("/api/selo/B097BYXGXN?t=" + TOKEN)).status).toBe(401);
   });
   test("item rastreado devolve só o resumo", async () => {
-    const j = (await sel("/api/selo/B097BYXGXN", TOKEN).json()) as any;
+    const j = (await (await sel("/api/selo/B097BYXGXN", TOKEN)).json()) as any;
     expect(Object.keys(j).sort()).toEqual(["atual", "atualizadoEm", "coletas", "linha", "max", "media", "min", "rastreado", "serie", "veredito"]);
     expect(j.rastreado).toBe(true);
     expect(j.atual).toBe(10);
     expect(j.veredito).toBe("sem_dados");
   });
   test("série do gráfico em ordem de tempo", async () => {
-    const j = (await sel("/api/selo/B097BYXGXN", TOKEN).json()) as any;
+    const j = (await (await sel("/api/selo/B097BYXGXN", TOKEN)).json()) as any;
     expect(j.serie.length).toBe(2);
     expect(j.serie[0].t < j.serie[1].t).toBe(true);
     expect(Object.keys(j.serie[0]).sort()).toEqual(["t", "v"]);
   });
-  test("downsample mantém extremos e limita o tamanho", () => {
+  test("downsample mantém extremos e limita o tamanho", async () => {
     const r = downsample(Array.from({ length: 1000 }, (_, i) => i), 120);
     expect(r.length).toBe(120);
     expect(r[0]).toBe(0);
@@ -145,14 +148,178 @@ describe("selo do userscript", () => {
     const am = (preco: number) => ({ amazon: { linha: "amazon", preco, vendedor: "Amazon" } }) as const;
     store.saveSnapshot(1, "2026-10-23T14:40:00.000Z", [], am(8));
     store.saveSnapshot(1, "2026-10-23T14:50:00.000Z", [], am(20));
-    expect(((await sel("/api/selo/B097BYXGXN", TOKEN).json()) as any).veredito).toBe("acima");
+    expect(((await (await sel("/api/selo/B097BYXGXN", TOKEN)).json()) as any).veredito).toBe("acima");
     store.saveSnapshot(1, "2026-10-23T14:55:00.000Z", [], am(8));
-    expect(((await sel("/api/selo/B097BYXGXN", TOKEN).json()) as any).veredito).toBe("minimo");
+    expect(((await (await sel("/api/selo/B097BYXGXN", TOKEN)).json()) as any).veredito).toBe("minimo");
   });
   test("item não rastreado e ASIN inválido", async () => {
-    const r = sel("/api/selo/B000000000", TOKEN);
+    const r = await sel("/api/selo/B000000000", TOKEN);
     expect(r.status).toBe(404);
     expect(((await r.json()) as any).rastreado).toBe(false);
-    expect(sel("/api/selo/x", TOKEN).status).toBe(404);
+    expect((await sel("/api/selo/x", TOKEN)).status).toBe(404);
   });
+});
+
+describe("ações do painel (escrita)", () => {
+  const TOKEN = "t".repeat(32);
+  const ORIGIN = "http://painel.test";
+  let net: ReturnType<typeof fakeNet>;
+  const W = (path: string, method: string, body?: unknown, h: Record<string, string> = {}) =>
+    handle(
+      new Request(`${ORIGIN}${path}`, {
+        method,
+        headers: { origin: ORIGIN, "content-type": "application/json", "x-painel": "1", ...h },
+        body: body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body),
+      }),
+    );
+  const ASIN = "B097BYXGXN";
+
+  beforeEach(() => {
+    net = fakeNet();
+    handle = panelHandler({
+      store,
+      now: () => new Date(net.clock.t),
+      intervalMin: 30,
+      token: TOKEN,
+      collect: (p) => collectOne(store, p, net.deps),
+      resolve: (t) => resolveAsin(t, async () => new Response(null, { status: 404 })),
+    });
+  });
+
+  test("lista informa que a edição está ligada; somenteLeitura desliga", async () => {
+    expect(((await (await handle(new Request(`${ORIGIN}/api/itens`))).json()) as any).edicao).toBe(true);
+    handle = panelHandler({ store, now: () => NOW, intervalMin: 30, collect: async () => ({ ok: true }) as any, resolve: async () => ({ ok: true, asin: ASIN }), somenteLeitura: true });
+    expect(((await (await handle(new Request(`${ORIGIN}/api/itens`))).json()) as any).edicao).toBe(false);
+    expect((await W(`/api/itens/${ASIN}/pausa`, "PUT", { pausado: true })).status).toBe(405);
+  });
+
+  test("cadastra por link, lê a página e devolve o item", async () => {
+    store.remove(1);
+    const r = await W("/api/itens", "POST", { texto: "olha https://www.amazon.com.br/dp/B097BYXGXN?ref=x" });
+    expect(r.status).toBe(200);
+    const j = (await r.json()) as any;
+    expect(j.resultados[0].status).toBe("novo");
+    expect(j.resultados[0].item.asin).toBe(ASIN);
+    expect(store.list()).toHaveLength(1);
+    expect(net.calls.length).toBeGreaterThan(0);
+  });
+
+  test("link repetido, domínio inválido e leitura que falha", async () => {
+    let j = (await (await W("/api/itens", "POST", { texto: `https://www.amazon.com.br/dp/${ASIN}` })).json()) as any;
+    expect(j.resultados[0].status).toBe("existente");
+    j = (await (await W("/api/itens", "POST", { texto: "https://example.com/x" })).json()) as any;
+    expect(j.resultados[0].status).toBe("erro");
+    net.status = 503;
+    j = (await (await W("/api/itens", "POST", { texto: "https://www.amazon.com.br/dp/B000000001" })).json()) as any;
+    expect(j.resultados[0].status).toBe("erro");
+    expect(store.getByAsin("B000000001")).toBeNull();
+  });
+
+  test("vários links de uma vez, no máximo 20", async () => {
+    const links = Array.from({ length: 25 }, (_, i) => `https://www.amazon.com.br/dp/B0000000${String(i).padStart(2, "0")}`).join("\n");
+    const j = (await (await W("/api/itens", "POST", { texto: links })).json()) as any;
+    expect(j.resultados).toHaveLength(20);
+    expect(j.ignorados).toBe(5);
+  });
+
+  test("texto sem link, grande demais ou de tipo errado", async () => {
+    expect((await W("/api/itens", "POST", { texto: "sem link" })).status).toBe(400);
+    expect((await W("/api/itens", "POST", { texto: 5 })).status).toBe(400);
+    expect((await W("/api/itens", "POST", { texto: "x".repeat(4001) })).status).toBe(400);
+    expect((await W("/api/itens", "POST", { texto: "x".repeat(9000) })).status).toBe(413);
+    expect((await W("/api/itens", "POST", "{nao json")).status).toBe(400);
+    expect((await W("/api/itens", "POST", "[1]")).status).toBe(400);
+  });
+
+  test("alvo: define, aceita formato brasileiro, recusa lixo e limpa", async () => {
+    let r = await W(`/api/itens/${ASIN}/alvo`, "PUT", { linha: "amazon", valor: "1.299,90" });
+    expect(r.status).toBe(200);
+    expect(store.getAlvo(1, "amazon")).toBe(1299.9);
+    expect(((await r.json()) as any).dentroDoAlvo).toBe(true);
+    for (const valor of [-1, 0, "abc", 1e9, true, {}]) expect((await W(`/api/itens/${ASIN}/alvo`, "PUT", { linha: "amazon", valor })).status).toBe(400);
+    expect((await W(`/api/itens/${ASIN}/alvo`, "PUT", { linha: "outra", valor: 5 })).status).toBe(400);
+    expect(store.getAlvo(1, "amazon")).toBe(1299.9);
+    r = await W(`/api/itens/${ASIN}/alvo`, "PUT", { linha: "amazon", valor: null });
+    expect(r.status).toBe(200);
+    expect(store.getAlvo(1, "amazon")).toBeNull();
+  });
+
+  test("alvo em linha desligada dá 409", async () => {
+    store.setLinhaOn(1, "terceiros", false);
+    expect((await W(`/api/itens/${ASIN}/alvo`, "PUT", { linha: "terceiros", valor: 5 })).status).toBe(409);
+  });
+
+  test("pausa e retoma; valor precisa ser booleano", async () => {
+    expect((await W(`/api/itens/${ASIN}/pausa`, "PUT", { pausado: true })).status).toBe(200);
+    expect(store.getById(1)!.pausado).toBe(true);
+    expect((await W(`/api/itens/${ASIN}/pausa`, "PUT", { pausado: false })).status).toBe(200);
+    expect(store.getById(1)!.pausado).toBe(false);
+    expect((await W(`/api/itens/${ASIN}/pausa`, "PUT", { pausado: "sim" })).status).toBe(400);
+  });
+
+  test("silencia por 24 h e reativa", async () => {
+    let j = (await (await W(`/api/itens/${ASIN}/silencio`, "PUT", { silenciado: true })).json()) as any;
+    expect(j.silenciadoAte).toBe(new Date(net.clock.t + 24 * 3_600_000).toISOString());
+    j = (await (await W(`/api/itens/${ASIN}/silencio`, "PUT", { silenciado: false })).json()) as any;
+    expect(j.silenciadoAte).toBeNull();
+  });
+
+  test("liga linha (lendo na hora) e desliga; amazon não é aceita", async () => {
+    store.setLinhaOn(1, "terceiros", false);
+    net.calls.length = 0;
+    const j = (await (await W(`/api/itens/${ASIN}/linhas`, "PUT", { linha: "terceiros", ligada: true })).json()) as any;
+    expect(store.getById(1)!.terceirosOn).toBe(true);
+    expect(j.leitura).toBe("ok");
+    expect(net.calls.length).toBeGreaterThan(0);
+    await W(`/api/itens/${ASIN}/linhas`, "PUT", { linha: "terceiros", ligada: false });
+    expect(store.getById(1)!.terceirosOn).toBe(false);
+    expect((await W(`/api/itens/${ASIN}/linhas`, "PUT", { linha: "amazon", ligada: false })).status).toBe(400);
+  });
+
+  test("remove o item e apaga o histórico", async () => {
+    expect((await W(`/api/itens/${ASIN}`, "DELETE")).status).toBe(200);
+    expect(store.list()).toHaveLength(0);
+    expect((await W(`/api/itens/${ASIN}`, "DELETE")).status).toBe(404);
+  });
+
+  test("CSRF: exige mesma origem, JSON e cabeçalho do painel", async () => {
+    const body = { pausado: true };
+    const path = `/api/itens/${ASIN}/pausa`;
+    expect((await W(path, "PUT", body, { origin: "http://evil.test" })).status).toBe(403);
+    expect((await W(path, "PUT", body, { origin: "null" })).status).toBe(403);
+    expect((await W(path, "PUT", body, { "sec-fetch-site": "cross-site" })).status).toBe(403);
+    expect((await W(path, "PUT", body, { "x-painel": "0" })).status).toBe(403);
+    expect((await W(path, "PUT", body, { "content-type": "text/plain" })).status).toBe(415);
+    const semOrigin = await handle(new Request(`${ORIGIN}${path}`, { method: "PUT", headers: { "content-type": "application/json", "x-painel": "1" }, body: "{}" }));
+    expect(semOrigin.status).toBe(403);
+    expect(store.getById(1)!.pausado).toBe(false);
+  });
+
+  test("selo não dá acesso às rotas de escrita e continua só leitura", async () => {
+    const h = { "x-selo-token": TOKEN };
+    const semOrigin = (path: string, method: string) => handle(new Request(`${ORIGIN}${path}`, { method, headers: { ...h, "content-type": "application/json", "x-painel": "1" }, body: "{}" }));
+    expect((await semOrigin(`/api/itens/${ASIN}`, "DELETE")).status).toBe(403);
+    expect((await semOrigin("/api/itens", "POST")).status).toBe(403);
+    for (const m of ["POST", "PUT", "DELETE", "PATCH"]) expect((await W(`/api/selo/${ASIN}`, m, {}, h)).status).toBe(405);
+    expect(store.list()).toHaveLength(1);
+  });
+
+  test("rotas e métodos desconhecidos", async () => {
+    expect((await W("/api/saude", "POST", {})).status).toBe(405);
+    expect((await W(`/api/itens/${ASIN}/alvo`, "POST", {})).status).toBe(405);
+    expect((await W(`/api/itens/${ASIN}/nada`, "PUT", {})).status).toBe(405);
+    expect((await W("/api/itens/B000000000/pausa", "PUT", { pausado: true })).status).toBe(404);
+  });
+
+  test("respostas de escrita têm cabeçalhos de segurança", async () => {
+    const r = await W(`/api/itens/${ASIN}/pausa`, "PUT", { pausado: true });
+    expect(r.headers.get("content-security-policy")).toContain("default-src 'none'");
+    expect(r.headers.get("cache-control")).toBe("no-store");
+  });
+});
+
+describe("config: PANEL_READONLY", () => {
+  const base = { TELEGRAM_BOT_TOKEN: "t", TELEGRAM_CHAT_ID: "1" };
+  test("escrita ligada por padrão", () => expect(loadConfig(base).panelReadonly).toBe(false));
+  test("PANEL_READONLY=1 desliga", () => expect(loadConfig({ ...base, PANEL_READONLY: "1" }).panelReadonly).toBe(true));
 });

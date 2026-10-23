@@ -1,3 +1,4 @@
+import { Actions, MAX_BATCH, RESOLVE_ERRORS, extractLinks, isMuted, muteKey } from "./actions.ts";
 import type { AsinResult } from "./amazon/asin.ts";
 import { productUrl } from "./amazon/fetch.ts";
 import type { CollectOutcome } from "./collector.ts";
@@ -18,15 +19,8 @@ export interface BotDeps {
 }
 
 const AWAITING = "awaiting_target";
-const MAX_BATCH = 20;
-const MUTE_MS = 24 * 3_600_000;
 
-export const muteKey = (id: number): string => `mute:${id}`;
-
-export function isMuted(store: Store, id: number, now: Date): boolean {
-  const until = store.getMeta(muteKey(id));
-  return until != null && new Date(until).getTime() > now.getTime();
-}
+export { isMuted, muteKey };
 
 export const alertKeyboard = (p: Product): Button[][] => [
   [
@@ -36,15 +30,12 @@ export const alertKeyboard = (p: Product): Button[][] => [
   ],
 ];
 
-const RESOLVE_ERRORS: Record<string, string> = {
-  sem_link: "Não achei um link nessa mensagem.",
-  dominio_nao_suportado: "Só aceito links da amazon.com.br (e os curtos amzn.to e a.co).",
-  asin_nao_encontrado: "Não achei o código do produto nesse link. Cole o link da página do produto.",
-  falha_ao_resolver: "Não consegui abrir o link curto. Tente colar o link completo do produto.",
-};
-
 export class Bot {
-  constructor(private readonly d: BotDeps) {}
+  private readonly act: Actions;
+
+  constructor(private readonly d: BotDeps) {
+    this.act = new Actions(d);
+  }
 
   private get store(): Store {
     return this.d.store;
@@ -67,7 +58,7 @@ export class Bot {
     }
     if (/https?:\/\//i.test(text) || /\b(amzn\.to|a\.co)\//i.test(text)) {
       this.store.setMeta(AWAITING, null);
-      const links = [...new Set(text.match(/https?:\/\/[^\s<>"']+/gi) ?? [])];
+      const links = extractLinks(text);
       return links.length > 1 ? this.addMany(links) : this.addLink(text);
     }
     const aw = this.store.getMeta(AWAITING);
@@ -125,8 +116,8 @@ export class Bot {
       case "/pausar": {
         const p = await needP();
         if (!p) return;
-        this.store.setPausado(p.id, !p.pausado);
-        return this.d.send(!p.pausado ? `Item #${n} pausado. Sem coletas nem alertas até você retomar.` : `Item #${n} retomado.`);
+        const pausado = this.act.setPausa(p);
+        return this.d.send(pausado ? `Item #${n} pausado. Sem coletas nem alertas até você retomar.` : `Item #${n} retomado.`);
       }
       case "/remover": {
         const p = await needP();
@@ -144,28 +135,15 @@ export class Bot {
   }
 
   private async addLink(text: string): Promise<void> {
-    const r = await this.d.resolve(text);
-    if (!r.ok) return this.d.send(RESOLVE_ERRORS[r.motivo] ?? "Não consegui usar esse link.");
-    const existing = this.store.getByAsin(r.asin);
-    if (existing) return this.d.send(`Esse produto já está sendo rastreado: <b>#${this.store.numberOf(existing.id)}</b> ${fmt.esc(existing.titulo ?? existing.asin)}`);
-
-    const p = this.store.addProduct(r.asin, null, this.d.now().toISOString());
-    await this.d.send("Lendo a página…");
-    let outcome: CollectOutcome | null = null;
-    try {
-      outcome = await this.d.collect(p);
-    } catch {
-      outcome = null;
+    const r = await this.act.addLink(text, () => this.d.send("Lendo a página…"));
+    if (!r.ok) {
+      if (r.erro === "link") return this.d.send(RESOLVE_ERRORS[r.motivo] ?? "Não consegui usar esse link.");
+      if (r.erro === "existente") return this.d.send(`Esse produto já está sendo rastreado: <b>#${this.store.numberOf(r.product.id)}</b> ${fmt.esc(r.product.titulo ?? r.product.asin)}`);
+      return this.d.send(`Não consegui ler a página agora${r.detalhe ? ` (${r.detalhe})` : ""}. Nada foi cadastrado. Tente de novo em alguns minutos.`);
     }
-    if (!outcome || !outcome.ok) {
-      this.store.remove(p.id);
-      const why = outcome && !outcome.ok ? ` (${outcome.kind})` : "";
-      return this.d.send(`Não consegui ler a página agora${why}. Nada foi cadastrado. Tente de novo em alguns minutos.`);
-    }
-    const fresh = this.store.getById(p.id)!;
-    const view = this.view(fresh);
+    const view = this.view(r.product);
     await this.d.send(fmt.card(view));
-    return this.askTarget(fresh, view.linhas.amazon.atual);
+    return this.askTarget(r.product, view.linhas.amazon.atual);
   }
 
   /** Vários links de uma vez (ex.: do userscript na busca). Cadastra sem perguntar alvo e resume no fim. */
@@ -175,32 +153,13 @@ export class Bot {
     const lines: string[] = [];
     let novos = 0;
     for (const link of list) {
-      const r = await this.d.resolve(link);
-      if (!r.ok) {
-        lines.push(`✗ ${fmt.esc(link.slice(0, 60))}: ${RESOLVE_ERRORS[r.motivo] ?? "link inválido"}`);
-        continue;
-      }
-      const existing = this.store.getByAsin(r.asin);
-      if (existing) {
-        lines.push(`• já rastreado: #${this.store.numberOf(existing.id)} ${fmt.esc(existing.titulo ?? existing.asin)}`);
-        continue;
-      }
-      const p = this.store.addProduct(r.asin, null, this.d.now().toISOString());
-      let ok = false;
-      try {
-        const o = await this.d.collect(p);
-        ok = o.ok;
-      } catch {
-        ok = false;
-      }
-      if (!ok) {
-        this.store.remove(p.id);
-        lines.push(`✗ ${r.asin}: não consegui ler a página agora`);
-        continue;
-      }
-      novos++;
-      const fresh = this.store.getById(p.id)!;
-      lines.push(`✓ #${this.store.numberOf(fresh.id)} ${fmt.esc(fresh.titulo ?? fresh.asin)}`);
+      const r = await this.act.addLink(link);
+      if (r.ok) {
+        novos++;
+        lines.push(`✓ #${this.store.numberOf(r.product.id)} ${fmt.esc(r.product.titulo ?? r.product.asin)}`);
+      } else if (r.erro === "link") lines.push(`✗ ${fmt.esc(link.slice(0, 60))}: ${RESOLVE_ERRORS[r.motivo] ?? "link inválido"}`);
+      else if (r.erro === "existente") lines.push(`• já rastreado: #${this.store.numberOf(r.product.id)} ${fmt.esc(r.product.titulo ?? r.product.asin)}`);
+      else lines.push(`✗ ${r.asin}: não consegui ler a página agora`);
     }
     if (links.length > list.length) lines.push(`Só os primeiros ${MAX_BATCH} links foram usados.`);
     await this.d.send(`<b>${novos} novo(s) item(ns).</b>\n${lines.join("\n")}\n\nDefina alvos com <code>/alvo N valor</code>.`);
@@ -223,9 +182,10 @@ export class Bot {
   }
 
   private async setAlvo(p: Product, linha: LineKey, v: number): Promise<void> {
-    this.store.setAlvo(p.id, linha, v);
+    const res = this.act.setAlvo(p, linha, v);
+    if (!res.ok) return this.d.send(`A linha <b>${LINE_NAMES[linha]}</b> está desligada. Ligue com <code>/linhas ${this.store.numberOf(p.id)}</code>.`);
     const view = this.view(p);
-    const atual = view.linhas[linha].atual;
+    const atual = res.atual;
     let msg = `Alvo da linha <b>${LINE_NAMES[linha]}</b> do item #${view.num}: <b>${fmt.money(v)}</b>. Aviso quando ficar igual ou abaixo.`;
     if (atual != null && atual <= v) msg += `\nO preço atual (${fmt.money(atual)}) já está dentro do alvo. Você será avisado na próxima coleta.`;
     return this.d.send(msg);
@@ -249,27 +209,22 @@ export class Bot {
       case "h":
         return this.d.send(fmt.history(this.view(p)));
       case "m":
-        this.store.setMeta(muteKey(p.id), new Date(this.d.now().getTime() + MUTE_MS).toISOString());
+        this.act.silenciar(p, true);
         return this.d.send(`Ok, sem alertas de #${this.store.numberOf(p.id)} por 24 h.`);
       case "rm": {
-        const n = this.store.numberOf(p.id);
-        this.store.remove(p.id);
+        const n = this.act.remove(p);
         return this.d.send(`Item #${n} removido. Os demais foram renumerados.`);
       }
       case "lg": {
         const k = b === "terceiros" || b === "usado" ? b : null;
         if (!k) return;
         const on = !(k === "terceiros" ? p.terceirosOn : p.usadoOn);
-        this.store.setLinhaOn(p.id, k, on);
+        this.act.setLinha(p, k, on);
         const nome = LINE_NAMES[k];
         if (!on) return this.d.send(`Linha <b>${nome}</b> desligada para #${this.store.numberOf(p.id)}. O histórico fica guardado.`);
         await this.d.send(`Linha <b>${nome}</b> ligada para #${this.store.numberOf(p.id)}. Lendo agora (2 requisições por rodada a partir daqui)…`);
-        try {
-          const o = await this.d.collect(this.store.getById(p.id)!);
-          if (!o.ok) return this.d.send(`Não consegui ler agora (${o.kind}). A linha será coletada na próxima rodada.`);
-        } catch {
-          return this.d.send("Não consegui ler agora. A linha será coletada na próxima rodada.");
-        }
+        const o = await this.act.collectNow(p);
+        if (!o.ok) return this.d.send(o.detalhe ? `Não consegui ler agora (${o.detalhe}). A linha será coletada na próxima rodada.` : "Não consegui ler agora. A linha será coletada na próxima rodada.");
         return this.d.send(fmt.card(this.view(this.store.getById(p.id)!)));
       }
       default:
