@@ -33,10 +33,15 @@ export type CollectOutcome =
   | { ok: true; page: ProductPage; points: Partial<Record<LineKey, LinePoint>>; alertas: AlertItem[]; descartadas: number; painel: boolean }
   | { ok: false; kind: BlockKind; falhasProduto: number; avisarProduto: boolean };
 
-/** O painel só é buscado quando precisa: linhas extras ligadas, ou quando a Amazon pode estar vendendo fora da caixa de compra. */
+/**
+ * O painel só é buscado quando precisa: linhas extras ligadas, ou quando a Amazon pode estar vendendo fora da caixa de compra.
+ * Com "Amazon Global" na caixa de compra, a Amazon.com.br pode ter uma oferta mais barata fora dela, e a página
+ * nem sempre mostra a contagem de outras opções: o painel é buscado sempre.
+ */
 export function needsPanel(p: Product, page: ProductPage): boolean {
-  if (!page.outrasOpcoes) return false;
-  return p.terceirosOn || p.usadoOn || !page.vendidoPorAmazon;
+  const global = /global/i.test(page.buyBoxVendedor ?? "");
+  if (!page.outrasOpcoes && !global) return false;
+  return p.terceirosOn || p.usadoOn || !page.vendidoPorAmazon || global;
 }
 
 let uaCounter = 0;
