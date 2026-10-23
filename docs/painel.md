@@ -119,3 +119,5 @@ Apagar um grupo não apaga os itens. O alvo continua sendo por item. As escritas
 Atalho: ao buscar (ex.: `random access`) e a lista mostrar 2 ou mais itens, aparece **Agrupar os N itens desta busca**; ele cria o grupo e coloca todos de uma vez.
 
 **Arrastar e soltar** (no computador): arraste um item sobre outro e solte para agrupar os dois (o painel sugere um nome pelas palavras em comum dos títulos, que você pode editar). Solte um item sobre um grupo para colocá-lo nele, ou sobre "Sem grupo" para tirá-lo. Itens agrupados aparecem como **um só cartão** na lista; clique nele para ver o grupo e abrir os itens. Em celular o arrastar não funciona: use o campo Grupo do item. Renomear: botão Renomear na visão do grupo.
+
+Ao arrastar, a página rola sozinha para cima ou para baixo quando o item chega perto da borda da janela.

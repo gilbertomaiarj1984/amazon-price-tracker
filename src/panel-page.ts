@@ -309,10 +309,19 @@ function soltarEmItem(src,dst){const a=S.itens.find(i=>i.asin===src),b=S.itens.f
  if(a.grupoId!=null)return rodar(null,()=>colocar(b.asin,a.grupoId,'Item colocado em '+gnome(a.grupoId)+'.'));
  const n=(prompt('Nome do grupo para estes 2 itens (sugestão pelos títulos, pode editar):',sugerirNome([a,b]))||'').trim();if(!n)return;
  rodar(null,async()=>{const g=await api('POST','/api/grupos',{nome:n});await api('PUT','/api/itens/'+a.asin+'/grupo',{grupoId:g.id});await colocar(b.asin,g.id,'Grupo criado com 2 itens.');abrirGrupo(g.id)})}
+/* rola sozinho quando o item arrastado chega perto da borda de cima ou de baixo: primeiro a lista da esquerda (no desktop ela rola por dentro), senão a página */
+let dragX=null,dragY=null,dragTm=null;
+document.addEventListener('dragover',e=>{dragX=e.clientX;dragY=e.clientY});
+const passoBorda=(y,topo,base)=>{const z=70,f=d=>Math.min(60,Math.ceil(d/2)+3);return y<topo+z?-f(topo+z-y):y>base-z?f(y-(base-z)):0};
+function autoRolar(on){clearInterval(dragTm);dragTm=null;if(!on)return;dragX=dragY=null;
+ dragTm=setInterval(()=>{if(!S.drag){autoRolar(false);return}if(dragY==null)return;
+  for(const el of [$('#lst')]){if(!el||el.scrollHeight<=el.clientHeight)continue;const r=el.getBoundingClientRect();
+   if(dragX>=r.left&&dragX<=r.right&&dragY>=r.top-40&&dragY<=r.bottom+40){const v=passoBorda(dragY,r.top,r.bottom);if(v){const a=el.scrollTop;el.scrollTop+=v;if(el.scrollTop!==a)return}}}
+  const v=passoBorda(dragY,0,innerHeight);if(v)scrollBy(0,v)},16)}
 function ligarDrag(){const alvo=(el,fn)=>{el.ondragover=e=>{if(!S.drag)return;e.preventDefault();el.classList.add('over')};el.ondragleave=()=>el.classList.remove('over');
   el.ondrop=e=>{e.preventDefault();el.classList.remove('over');const src=S.drag;S.drag=null;if(src)fn(src)}};
- $('#lst').querySelectorAll('[data-dr]').forEach(el=>{el.ondragstart=e=>{S.drag=el.dataset.dr;el.classList.add('drag');try{e.dataTransfer.setData('text/plain',S.drag);e.dataTransfer.effectAllowed='move'}catch(x){}};
-  el.ondragend=()=>{S.drag=null;el.classList.remove('drag');document.querySelectorAll('.over').forEach(o=>o.classList.remove('over'))};
+ $('#lst').querySelectorAll('[data-dr]').forEach(el=>{el.ondragstart=e=>{S.drag=el.dataset.dr;autoRolar(true);el.classList.add('drag');try{e.dataTransfer.setData('text/plain',S.drag);e.dataTransfer.effectAllowed='move'}catch(x){}};
+  el.ondragend=()=>{S.drag=null;autoRolar(false);el.classList.remove('drag');document.querySelectorAll('.over').forEach(o=>o.classList.remove('over'))};
   alvo(el,src=>soltarEmItem(src,el.dataset.dr))});
  $('#lst').querySelectorAll('[data-dg]').forEach(b=>alvo(b,src=>{const it=S.itens.find(i=>i.asin===src);if(it&&it.grupoId!==Number(b.dataset.dg))rodar(null,()=>colocar(src,Number(b.dataset.dg),'Item colocado no grupo.'))}));
  $('#esq').querySelectorAll('[data-g]').forEach(b=>alvo(b,src=>{const g=b.dataset.g;if(g==='none'){const it=S.itens.find(i=>i.asin===src);if(it&&it.grupoId!=null)rodar(null,()=>colocar(src,null,'Item fora de grupos.'))}else rodar(null,()=>colocar(src,Number(g),'Item colocado no grupo.'))}))}
