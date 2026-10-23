@@ -215,6 +215,13 @@ export class Store {
     };
   }
 
+  lastPoint(id: number, linha: LineKey): { preco: number; vendedor: string | null; coletadoEm: string } | null {
+    const r = this.db
+      .query("SELECT preco, vendedor, coletado_em FROM price_lines WHERE product_id = ? AND linha = ? ORDER BY coletado_em DESC LIMIT 1")
+      .get(id, linha) as { preco: number; vendedor: string | null; coletado_em: string } | null;
+    return r ? { preco: r.preco, vendedor: r.vendedor, coletadoEm: r.coletado_em } : null;
+  }
+
   /** Menor preço da linha antes de `antesDe` (para detectar novo mínimo). */
   minBefore(id: number, linha: LineKey, antesDe: string): number | null {
     const r = this.db

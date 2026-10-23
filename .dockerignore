@@ -1,0 +1,11 @@
+.git
+.github
+node_modules
+data
+tests
+scripts
+docs
+*.md
+.env
+.env.*
+links*.txt
