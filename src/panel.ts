@@ -1,3 +1,4 @@
+import { IMAGE_HOST_RE } from "./amazon/parse.ts";
 import { parseKeepaList, MAX_IMPORT } from "./keepa.ts";
 import { Actions, MAX_BATCH, RESOLVE_ERRORS, extractLinks, mutedUntil } from "./actions.ts";
 import type { ActionDeps } from "./actions.ts";
@@ -25,6 +26,8 @@ export interface PanelItem {
   falhasSeguidas: number;
   silenciadoAte: string | null;
   url: string;
+  imagem: string | null;
+  criadoEm: string;
   linhas: ReturnType<typeof buildView>["linhas"];
   /** Preço da Amazon (ou da linha mais barata ligada) nos últimos 7 dias, para o mini-gráfico. */
   mini: Array<{ t: string; v: number }>;
@@ -72,7 +75,7 @@ export function panelItems(store: Store, now: Date): PanelItem[] {
         "SELECT coletado_em AS t, preco AS v FROM price_lines WHERE product_id = ? AND linha = ? AND coletado_em >= ? ORDER BY coletado_em",
       )
       .all(p.id, v.linhas.amazon.atual != null || v.linhas.amazon.coletas > 0 ? "amazon" : "terceiros", desde) as PanelItem["mini"];
-    return { num: v.num, asin: p.asin, titulo: p.titulo, pausado: p.pausado, falhasSeguidas: p.falhasSeguidas, silenciadoAte: mutedUntil(store, p.id, now), url: productUrl(p.asin), linhas: v.linhas, mini: rows };
+    return { num: v.num, asin: p.asin, titulo: p.titulo, pausado: p.pausado, falhasSeguidas: p.falhasSeguidas, silenciadoAte: mutedUntil(store, p.id, now), url: productUrl(p.asin), imagem: p.imagem && IMAGE_HOST_RE.test(p.imagem) ? p.imagem : null, criadoEm: p.criadoEm, linhas: v.linhas, mini: rows };
   });
 }
 
@@ -140,7 +143,7 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
 
 const SECURITY = {
-  "content-security-policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'",
+  "content-security-policy": "default-src 'none'; img-src https://m.media-amazon.com https://images-na.ssl-images-amazon.com; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'",
   "x-content-type-options": "nosniff",
   "referrer-policy": "no-referrer",
 };

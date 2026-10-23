@@ -96,3 +96,7 @@ Sem passar pelo proxy dá para abrir por túnel SSH até o IP do container: `doc
 3. O painel mostra o resumo (importados, repetidos, inválidos, outros países). Máximo de 200 itens por importação; arquivo até 6000 caracteres.
 
 Os itens entram **sem alvo** e sem ler a Amazon na hora (68 leituras seguidas dariam captcha). O título e o preço aparecem nas próximas rodadas, que já espaçam as requisições. Como o Keepa não informa o domínio, o painel assume amazon.com.br; ASINs que não existirem lá falham na coleta e você pode removê-los. Nenhum login nem chave do Keepa é usado.
+
+## Cards com foto
+
+A lista de itens é uma grade de cards: foto, título, preço atual da Amazon, alvo, mínimo de 30 dias, variação, mini-gráfico e etiquetas (pausado, silenciado, falha, dentro do alvo). A foto é lida da página do produto na coleta e só carrega dos hosts de imagem da Amazon (`m.media-amazon.com`, `images-na.ssl-images-amazon.com`, liberados na CSP). Itens recém-importados mostram um ícone até a primeira coleta.

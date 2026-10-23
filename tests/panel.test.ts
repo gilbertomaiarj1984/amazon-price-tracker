@@ -350,3 +350,17 @@ describe("importar do Keepa", () => {
     expect((await post({ texto: "B07GW4CM5F" })).status).toBe(405);
   });
 });
+
+describe("cards com foto", () => {
+  test("lista traz a foto salva e a CSP libera só os hosts de imagem da Amazon", async () => {
+    const p = store.getByAsin("B097BYXGXN")!;
+    store.setImagem(p.id, "https://m.media-amazon.com/images/I/aaa.jpg");
+    const r = await get("/api/itens");
+    expect(((await r.json()) as any).itens[0].imagem).toBe("https://m.media-amazon.com/images/I/aaa.jpg");
+    expect((await get("/")).headers.get("content-security-policy")).toContain("img-src https://m.media-amazon.com https://images-na.ssl-images-amazon.com;");
+  });
+  test("imagem fora dos hosts permitidos não sai na API", async () => {
+    store.setImagem(store.getByAsin("B097BYXGXN")!.id, "https://evil.example/x.jpg");
+    expect(((await (await get("/api/itens")).json()) as any).itens[0].imagem).toBeNull();
+  });
+});
