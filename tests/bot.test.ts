@@ -32,6 +32,24 @@ const last = () => sent[sent.length - 1]!;
 const texts = () => sent.map((m) => m.html).join("\n---\n");
 const cbs = (m: Msg) => (m.kb ?? []).flat().map((b) => ("callback_data" in b ? b.callback_data : b.url));
 
+describe("cadastro de vários links", () => {
+  test("cadastra todos sem perguntar alvo e resume", async () => {
+    await bot.handleText(`${LINK}\nhttps://www.amazon.com.br/dp/B000000001\nhttps://example.com/x`);
+    expect(store.list().length).toBeGreaterThanOrEqual(1);
+    expect(sent[0]!.html).toContain("Cadastrando 3 links");
+    expect(last().html).toContain("novo(s) item(ns)");
+    expect(last().html).toContain("amazon.com.br");
+    expect(store.getMeta("awaiting_target")).toBeNull();
+  });
+  test("link repetido conta uma vez e já rastreado é avisado", async () => {
+    await bot.handleText(LINK);
+    sent.length = 0;
+    await bot.handleText(`${LINK}\n${LINK}\nhttps://www.amazon.com.br/dp/B097BYXGXN`);
+    expect(store.list()).toHaveLength(1);
+    expect(last().html).toContain("já rastreado");
+  });
+});
+
 describe("cadastro por link", () => {
   test("cola o link: lê a página, mostra o card e pergunta o alvo com sugestões", async () => {
     await bot.handleText(`olha ${LINK}`);
