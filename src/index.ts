@@ -6,6 +6,7 @@ import { Bot } from "./bot.ts";
 import { collectOne, realDeps } from "./collector.ts";
 import { loadConfig } from "./config.ts";
 import { Store } from "./db.ts";
+import { panelHandler } from "./panel.ts";
 import { createLock } from "./mutex.ts";
 import { loop, runCycle } from "./scheduler.ts";
 import { Telegram } from "./telegram.ts";
@@ -99,6 +100,11 @@ const cycle = () =>
     pauseMs: delay,
     log,
   }).finally(() => store.setMeta("last_cycle_at", String(Date.now())));
+
+if (cfg.panel) {
+  Bun.serve({ hostname: cfg.panel.host, port: cfg.panel.port, fetch: panelHandler({ store, now: () => new Date(), intervalMin: cfg.intervalMin }) });
+  log(`painel em http://${cfg.panel.host}:${cfg.panel.port} (somente leitura)`);
+}
 
 const stop = () => {
   log("encerrando");
