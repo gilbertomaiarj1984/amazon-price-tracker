@@ -32,9 +32,15 @@ export function card(v: ProductView): string {
   return lines.join("\n");
 }
 
-export function list(views: ProductView[]): string {
-  if (!views.length) return "Nenhum item rastreado. Cole um link da Amazon para começar.";
-  const out = [`<b>Itens rastreados (${views.length})</b>`, ""];
+/** Limite do Telegram é 4096 caracteres por mensagem; sobra margem para o HTML. */
+export const MAX_MSG = 3500;
+
+/** Lista dividida em páginas que cabem numa mensagem do Telegram. */
+export function list(views: ProductView[]): string[] {
+  if (!views.length) return ["Nenhum item rastreado. Cole um link da Amazon para começar."];
+  const head = `<b>Itens rastreados (${views.length})</b>`;
+  const pages: string[] = [];
+  let cur = head;
   for (const v of views) {
     const a = v.linhas.amazon;
     const alvo = a.alvo != null ? ` · alvo ${money(a.alvo)}` : "";
@@ -43,9 +49,15 @@ export function list(views: ProductView[]): string {
     else if (a.atual == null) st = "Amazon sem oferta";
     else if (a.alvo != null) st = a.atual <= a.alvo ? "abaixo do alvo" : `${pct(((a.atual - a.alvo) / a.alvo) * 100).replace("+", "")} acima do alvo`;
     else st = "sem alvo";
-    out.push(`<b>#${v.num}</b> ${esc((v.titulo ?? v.asin).slice(0, 60))}`, `${a.atual != null ? "Amazon " + money(a.atual) : "Amazon —"}${alvo}`, `<i>${st}</i>`, "");
+    const block = `\n\n<b>#${v.num}</b> ${esc((v.titulo ?? v.asin).slice(0, 60))}\n${a.atual != null ? "Amazon " + money(a.atual) : "Amazon —"}${alvo}\n<i>${st}</i>`;
+    if (cur.length + block.length > MAX_MSG) {
+      pages.push(cur);
+      cur = `<b>Itens rastreados (continuação)</b>`;
+    }
+    cur += block;
   }
-  return out.join("\n").trimEnd();
+  pages.push(cur);
+  return pages;
 }
 
 export function history(v: ProductView): string {

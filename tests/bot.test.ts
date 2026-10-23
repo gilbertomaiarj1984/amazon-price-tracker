@@ -128,6 +128,15 @@ describe("comandos", () => {
     expect(last().html).toContain("Amazon R$ 20,10");
     expect(last().html).toContain("sem alvo");
   });
+  test("/lista com 70 itens divide em mensagens abaixo do limite do Telegram", async () => {
+    for (let i = 2; i <= 70; i++) store.addProduct(`B${String(i).padStart(9, "0")}`, `Produto com um título bem longo número ${i} `.repeat(3), new Date().toISOString());
+    await bot.handleText("/lista");
+    expect(sent.length).toBeGreaterThan(1);
+    for (const m of sent) expect(m.html.length).toBeLessThan(4096);
+    const all = texts();
+    expect(all).toContain("Itens rastreados (70)");
+    for (const n of [1, 35, 70]) expect(all).toContain(`<b>#${n}</b>`);
+  });
   test("/lista vazia", async () => {
     store.remove(1);
     await bot.handleText("/lista");
