@@ -3,7 +3,7 @@ import { resolveAsin } from "../src/amazon/asin.ts";
 import { collectOne } from "../src/collector.ts";
 import { loadConfig } from "../src/config.ts";
 import { Store } from "../src/db.ts";
-import { amazonGaps, downsample, panelHandler } from "../src/panel.ts";
+import { amazonGaps, downsample, panelHandler, panelItems } from "../src/panel.ts";
 import { fakeNet } from "./helpers.ts";
 
 const NOW = new Date("2026-10-23T15:00:00.000Z");
@@ -442,4 +442,15 @@ test("card cai para o ícone quando a foto não carrega", async () => {
   expect(html).toContain("onerror=");
   const js = html.split("<script>")[1]!.split("</script>")[0]!;
   expect(() => new Function(js)).not.toThrow();
+});
+
+describe("última coleta no painel", () => {
+  test("item novo vem com ultimaColeta null; depois de uma falha, com o motivo", () => {
+    const store = new Store(":memory:");
+    const p = store.addProduct("B00C061HZY", null, "2026-10-23T00:00:00.000Z");
+    const now = new Date("2026-10-23T12:00:00.000Z");
+    expect(panelItems(store, now)[0]!.ultimaColeta).toBeNull();
+    store.setUltimaColeta(p.id, { em: now.toISOString(), ok: false, motivo: "captcha" });
+    expect(panelItems(store, now)[0]!.ultimaColeta).toMatchObject({ ok: false, motivo: "captcha" });
+  });
 });

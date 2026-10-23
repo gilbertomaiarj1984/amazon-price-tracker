@@ -3,6 +3,9 @@ import { collectOne, needsPanel } from "../src/collector.ts";
 import { Store } from "../src/db.ts";
 import { fakeNet, fx, tick } from "./helpers.ts";
 
+/** Painel de ofertas sem nenhuma oferta (nem da Amazon). */
+const PAINEL_VAZIO = `<div id="aod-container"><div id="aod-offer-list"></div></div>${"x".repeat(600)}`;
+
 let store: Store;
 beforeEach(() => {
   store = new Store(":memory:");
@@ -35,7 +38,8 @@ describe("collectOne", () => {
   test("buy box de terceiro com outras opções: busca o painel para ver se a Amazon vende", () => {
     const page = { titulo: "x", buyBox: 100, buyBoxVendedor: "Loja", vendidoPorAmazon: false, outrasAPartirDe: 90, outrasOpcoes: 3, disponivel: true };
     expect(needsPanel(add(), page)).toBe(true);
-    expect(needsPanel(add(), { ...page, outrasOpcoes: null })).toBe(false);
+    // Sem a contagem "N opções" na página, a Amazon ainda pode vender fora da caixa de compra (caso do B00C061HZY).
+    expect(needsPanel(add(), { ...page, outrasOpcoes: null })).toBe(true);
     expect(needsPanel(add(), { ...page, vendidoPorAmazon: true })).toBe(false);
     // Amazon Global na caixa de compra: a Amazon.com.br pode estar mais barata no painel, mesmo sem contagem de opções.
     const global = { ...page, buyBoxVendedor: "Amazon Global", vendidoPorAmazon: true, outrasOpcoes: null };
@@ -89,6 +93,7 @@ describe("alertas na coleta", () => {
     await collectOne(store, p, net.deps);
     tick(net);
     net.product = fx("product-unavailable.html");
+    net.panel = PAINEL_VAZIO;
     const gone = await collectOne(store, p, net.deps);
     expect(gone.ok && gone.points.amazon).toBeUndefined();
     expect(store.getAlertState(p.id, "amazon").disponivel).toBe(false);
@@ -107,5 +112,57 @@ describe("alertas na coleta", () => {
     net.product = fx("product-real-shape.html").replace("R$ 20,10 com 15 por cento de desconto", "R$ 18,00");
     const r = await collectOne(store, p, net.deps);
     expect(r.ok && r.alertas[0]?.evento).toMatchObject({ tipo: "novo_minimo", preco: 18, minimoAnterior: 20.1 });
+  });
+});
+
+describe("última leitura do item (distingue aguardando, sem oferta e erro)", () => {
+  test("sem nenhuma leitura: nada registrado", () => {
+    expect(store.getUltimaColeta(add().id)).toBeNull();
+  });
+
+  test("página sem preço de destaque: leitura ok registrada, sem linha Amazon", async () => {
+    const p = add();
+    const r = await collectOne(store, p, fakeNet({ product: fx("product-unavailable.html"), panel: PAINEL_VAZIO }).deps);
+    expect(r.ok).toBe(true);
+    expect(store.lastPoint(p.id, "amazon")).toBeNull();
+    expect(store.getUltimaColeta(p.id)).toMatchObject({ ok: true, buyBox: null });
+  });
+
+  test("captcha e 503: registra o motivo, sem inventar 'sem oferta'", async () => {
+    const p = add();
+    await collectOne(store, p, fakeNet({ product: fx("captcha.html") }).deps);
+    expect(store.getUltimaColeta(p.id)).toMatchObject({ ok: false, motivo: "captcha" });
+    await collectOne(store, p, fakeNet({ status: 503 }).deps);
+    expect(store.getUltimaColeta(p.id)).toMatchObject({ ok: false, motivo: "http_503" });
+    await collectOne(store, p, fakeNet().deps);
+    expect(store.getUltimaColeta(p.id)).toMatchObject({ ok: true, buyBox: 20.1 });
+  });
+
+  test("erro de rede (timeout): registra erro_rede e repassa a exceção", async () => {
+    const p = add();
+    const net = fakeNet();
+    net.deps.fetchHtml = async () => {
+      throw new Error("timeout");
+    };
+    await expect(collectOne(store, p, net.deps)).rejects.toThrow("timeout");
+    expect(store.getUltimaColeta(p.id)).toMatchObject({ ok: false, motivo: "erro_rede" });
+  });
+});
+
+describe("caixa de compra de terceiro, Amazon Global só no painel de ofertas (B00C061HZY)", () => {
+  const offer = (id: string, preco: string, vendedor: string, envio: string) =>
+    `<div id="${id}"><div id="aod-offer-price"><span id="aod-price-0"><span class="a-price"><span class="a-offscreen">R$ ${preco}</span></span></span></div>` +
+    `<div id="aod-offer-shipsFrom"><div class="a-col-right"><span>${envio}</span></div></div>` +
+    `<div id="aod-offer-soldBy"><div class="a-col-right"><span>${vendedor}</span></div></div></div>`;
+  const painel = `<div id="aod-container">${offer("aod-pinned-offer", "469,33", "VORTEX IMPORT", "VORTEX IMPORT")}${offer("aod-offer", "404,14", "Amazon Global", "Amazon.com.br")}</div>` + "x".repeat(600);
+
+  test("grava a linha Amazon com a oferta do painel e registra leitura ok", async () => {
+    const p = add();
+    const net = fakeNet({ product: fx("product-third-party.html"), panel: painel });
+    const r = await collectOne(store, p, net.deps);
+    expect(r.ok).toBe(true);
+    expect(net.calls).toEqual(["produto", "painel"]);
+    expect(store.lastPoint(p.id, "amazon")).toMatchObject({ preco: 404.14, vendedor: "Amazon" });
+    expect(store.getUltimaColeta(p.id)).toMatchObject({ ok: true });
   });
 });

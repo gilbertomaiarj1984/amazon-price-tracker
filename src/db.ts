@@ -58,6 +58,16 @@ CREATE TABLE IF NOT EXISTS meta (
 );
 `;
 
+export interface UltimaColeta {
+  em: string;
+  ok: boolean;
+  /** Em falha: captcha, http_503, http_error, vazio, html_inesperado ou erro_rede. */
+  motivo?: string;
+  /** Em sucesso: vendedor da caixa de compra e preço lido, se houve (a linha Amazon pode não existir mesmo assim). */
+  vendedor?: string | null;
+  buyBox?: number | null;
+}
+
 export interface Product {
   id: number;
   asin: string;
@@ -313,6 +323,20 @@ export class Store {
 
   resetFailures(id: number): void {
     this.db.query("UPDATE products SET falhas_seguidas = 0 WHERE id = ?").run(id);
+  }
+
+  /** Último resultado de leitura do item (com ou sem preço), para distinguir "ainda não lido" de "lido sem oferta" e de "erro". */
+  setUltimaColeta(id: number, u: UltimaColeta): void {
+    this.setMeta(`ultima_coleta:${id}`, JSON.stringify(u));
+  }
+
+  getUltimaColeta(id: number): UltimaColeta | null {
+    try {
+      const u = JSON.parse(this.getMeta(`ultima_coleta:${id}`) ?? "null") as UltimaColeta | null;
+      return u && typeof u.em === "string" && typeof u.ok === "boolean" ? u : null;
+    } catch {
+      return null;
+    }
   }
 
   getMeta(key: string): string | null {

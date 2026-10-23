@@ -3,7 +3,7 @@ import { parseKeepaList, MAX_IMPORT } from "./keepa.ts";
 import { Actions, MAX_BATCH, consultaLiberadaEm, RESOLVE_ERRORS, extractLinks, mutedUntil } from "./actions.ts";
 import type { ActionDeps } from "./actions.ts";
 import { productUrl } from "./amazon/fetch.ts";
-import type { Grupo, Product, Store } from "./db.ts";
+import type { Grupo, Product, Store, UltimaColeta } from "./db.ts";
 import { parseUserNumber } from "./numbers.ts";
 import { PANEL_HTML } from "./panel-page.ts";
 import { DAY_MS, buildView } from "./view.ts";
@@ -30,6 +30,8 @@ export interface PanelItem {
   criadoEm: string;
   grupoId: number | null;
   linhas: ReturnType<typeof buildView>["linhas"];
+  /** Última leitura da Amazon (null = nunca lido): separa "aguardando", "sem oferta confirmado" e "erro". */
+  ultimaColeta: UltimaColeta | null;
   /** Preço da Amazon (ou da linha mais barata ligada) nos últimos 7 dias, para o mini-gráfico. */
   mini: Array<{ t: string; v: number }>;
 }
@@ -76,7 +78,7 @@ export function panelItems(store: Store, now: Date): PanelItem[] {
         "SELECT coletado_em AS t, preco AS v FROM price_lines WHERE product_id = ? AND linha = ? AND coletado_em >= ? ORDER BY coletado_em",
       )
       .all(p.id, v.linhas.amazon.atual != null || v.linhas.amazon.coletas > 0 ? "amazon" : "terceiros", desde) as PanelItem["mini"];
-    return { num: v.num, asin: p.asin, titulo: p.titulo, pausado: p.pausado, falhasSeguidas: p.falhasSeguidas, silenciadoAte: mutedUntil(store, p.id, now), url: productUrl(p.asin), imagem: p.imagem && IMAGE_HOST_RE.test(p.imagem) ? p.imagem : null, criadoEm: p.criadoEm, grupoId: p.grupoId, linhas: v.linhas, mini: rows };
+    return { num: v.num, asin: p.asin, titulo: p.titulo, pausado: p.pausado, falhasSeguidas: p.falhasSeguidas, silenciadoAte: mutedUntil(store, p.id, now), url: productUrl(p.asin), imagem: p.imagem && IMAGE_HOST_RE.test(p.imagem) ? p.imagem : null, criadoEm: p.criadoEm, grupoId: p.grupoId, linhas: v.linhas, ultimaColeta: store.getUltimaColeta(p.id), mini: rows };
   });
 }
 
