@@ -6,7 +6,7 @@ import { Bot } from "./bot.ts";
 import { collectOne, realDeps } from "./collector.ts";
 import { loadConfig } from "./config.ts";
 import { Store } from "./db.ts";
-import { panelHandler } from "./panel.ts";
+import { MAX_BODY, panelHandler } from "./panel.ts";
 import { createLock } from "./mutex.ts";
 import { loop, runCycle } from "./scheduler.ts";
 import { Telegram } from "./telegram.ts";
@@ -102,8 +102,23 @@ const cycle = () =>
   }).finally(() => store.setMeta("last_cycle_at", String(Date.now())));
 
 if (cfg.panel) {
-  Bun.serve({ hostname: cfg.panel.host, port: cfg.panel.port, fetch: panelHandler({ token: cfg.panelToken, store, now: () => new Date(), intervalMin: cfg.intervalMin }) });
-  log(`painel em http://${cfg.panel.host}:${cfg.panel.port} (somente leitura)`);
+  Bun.serve({
+    hostname: cfg.panel.host,
+    port: cfg.panel.port,
+    // Cadastrar links lê a Amazon uma por vez; dá tempo de sobra e limita o corpo das requisições.
+    idleTimeout: 120,
+    maxRequestBodySize: MAX_BODY,
+    fetch: panelHandler({
+      token: cfg.panelToken,
+      store,
+      now: () => new Date(),
+      intervalMin: cfg.intervalMin,
+      collect,
+      resolve: (t) => resolveAsin(t),
+      somenteLeitura: cfg.panelReadonly,
+    }),
+  });
+  log(`painel em http://${cfg.panel.host}:${cfg.panel.port} (${cfg.panelReadonly ? "somente leitura" : "com ações"})`);
 }
 
 const stop = () => {

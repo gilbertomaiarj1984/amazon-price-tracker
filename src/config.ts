@@ -9,6 +9,8 @@ export interface Config {
   panel: { host: string; port: number } | null;
   /** Token do selo do userscript (GET /api/selo/ASIN). Sem PANEL_TOKEN, o endpoint fica desligado. */
   panelToken: string | null;
+  /** PANEL_READONLY=1 desliga as ações de escrita do painel (cadastrar, alvo, pausar, linhas, remover). */
+  panelReadonly: boolean;
 }
 
 function intOf(env: Record<string, string | undefined>, key: string, def: number, min: number): number {
@@ -35,6 +37,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     intervalMin: intOf(env, "INTERVAL_MIN", 30, 5),
     reqMinMs,
     reqMaxMs,
+    panelReadonly: /^(1|true|sim)$/i.test(env["PANEL_READONLY"]?.trim() ?? ""),
     panelToken: env["PANEL_TOKEN"]?.trim() || null,
     panel: env["PANEL_PORT"]?.trim() ? { host: env["PANEL_HOST"]?.trim() || "127.0.0.1", port: intOf(env, "PANEL_PORT", 0, 1) } : null,
   };
