@@ -66,7 +66,8 @@ describe("API do userscript", () => {
     expect(j.atual).toBe(10);
     expect(j.estrela).toBe(true);
     expect(j.grupo).toEqual({ id: g.id, nome: "Ketchups" });
-    expect(j.linhas.amazon.alvo).toBeNull();
+    expect(j.alvo).toBeNull();
+    expect(j.menor).toBe(10);
     expect(j.ultimaColeta.ok).toBe(true);
     expect(j.edicao).toBe(true);
     expect(j.serie.length).toBe(1);
@@ -80,16 +81,14 @@ describe("API do userscript", () => {
     const r = await call("PUT", `/api/us/${ASIN}/alvo`, { valor: "9,50" });
     expect(r.status).toBe(200);
     const j = (await r.json()) as any;
-    expect(j.linhas.amazon.alvo).toBe(9.5);
+    expect(j.alvo).toBe(9.5);
     expect(j.dentroDoAlvo).toBe(false);
-    expect(store.getAlvo(store.getByAsin(ASIN)!.id, "amazon")).toBe(9.5);
+    expect(store.getAlvo(store.getByAsin(ASIN)!.id)).toBe(9.5);
     expect(((await (await call("PUT", `/api/us/${ASIN}/alvo`, { valor: 12 })).json()) as any).dentroDoAlvo).toBe(true);
-    expect(((await (await call("PUT", `/api/us/${ASIN}/alvo`, { valor: null })).json()) as any).linhas.amazon.alvo).toBeNull();
+    expect(((await (await call("PUT", `/api/us/${ASIN}/alvo`, { valor: null })).json()) as any).alvo).toBeNull();
   });
-  test("valida valor, linha e linha desligada", async () => {
+  test("valida o valor", async () => {
     for (const valor of [0, -1, "abc", 2_000_000, undefined]) expect((await call("PUT", `/api/us/${ASIN}/alvo`, { valor })).status).toBe(400);
-    expect((await call("PUT", `/api/us/${ASIN}/alvo`, { valor: 5, linha: "x" })).status).toBe(400);
-    expect((await call("PUT", `/api/us/${ASIN}/alvo`, { valor: 5, linha: "usado" })).status).toBe(409);
   });
   test("escrita exige cabeçalho, JSON e corpo pequeno", async () => {
     expect((await call("PUT", `/api/us/${ASIN}/alvo`, { valor: 5 }, { "x-us": "0" })).status).toBe(403);

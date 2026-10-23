@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Rastreador de preços
 // @namespace    price-tracker-local
-// @version      3.0.1
+// @version      3.1.0
 // @description  Botão "Rastrear" na página do produto e seleção de vários itens na busca. Janela com preços, gráfico e alvo editável (com token); copia links para o bot do Telegram.
 // @match        https://www.amazon.com.br/*
 // @grant        GM_setClipboard
@@ -185,8 +185,8 @@
     if (old) old.remove();
     const rastreado = data && data.rastreado !== false;
     const v = seloView(data);
-    const alvoAmazon = rastreado && data.linhas ? data.linhas.amazon.alvo : null;
-    const st = rastreado ? alvoStatus(data.atual, alvoAmazon) : null;
+    const alvoAmazon = rastreado ? (data.alvo != null ? data.alvo : null) : null;
+    const st = rastreado ? alvoStatus(data.menor != null ? data.menor : data.atual, alvoAmazon) : null;
     const cor = st ? st.cor : v.cor;
     const win = el("div", "position:fixed;right:16px;bottom:64px;z-index:2147483646;width:300px;border-radius:10px;background:#fff;color:#1d2329;font:13px/1.4 system-ui;box-shadow:0 4px 18px rgba(0,0,0,.35);overflow:hidden");
     win.id = "pt-win";
@@ -332,7 +332,7 @@
         writable = data && data.edicao !== false;
         const api = writable
           ? {
-              salvarAlvo: (valor) => chamar("PUT", path + "/alvo", usToken, "x-us-token", { valor, linha: "amazon" }),
+              salvarAlvo: (valor) => chamar("PUT", path + "/alvo", usToken, "x-us-token", { valor }),
               rastrear: () => chamar("POST", path + "/rastrear", usToken, "x-us-token", {}),
             }
           : null;
