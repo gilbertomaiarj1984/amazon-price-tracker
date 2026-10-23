@@ -313,6 +313,47 @@ describe("ações do painel (escrita)", () => {
     expect((await W(`/api/itens/${ASIN}/consultar`, "POST")).status).toBe(405);
   });
 
+  test("grupos: cria, coloca itens, compara e apaga sem perder os itens", async () => {
+    const outro = store.addProduct("B000000001", "Ketchup 2", "2026-10-02T00:00:00.000Z");
+    store.saveSnapshot(outro.id, "2026-10-23T14:30:00.000Z", [], { amazon: { linha: "amazon", preco: 7, vendedor: "Amazon" } });
+    const c = (await (await W("/api/grupos", "POST", { nome: "  Ketchup   Heinz " })).json()) as any;
+    expect(c.nome).toBe("Ketchup Heinz");
+    expect((await W("/api/grupos", "POST", { nome: "ketchup heinz" })).status).toBe(409);
+    expect((await W("/api/grupos", "POST", { nome: "  " })).status).toBe(400);
+    expect((await W("/api/grupos", "POST", { nome: "x".repeat(61) })).status).toBe(400);
+    for (const a of [ASIN, "B000000001"]) expect((await W(`/api/itens/${a}/grupo`, "PUT", { grupoId: c.id })).status).toBe(200);
+    expect((await W(`/api/itens/${ASIN}/grupo`, "PUT", { grupoId: 999 })).status).toBe(400);
+    expect((await W(`/api/itens/${ASIN}/grupo`, "PUT", { grupoId: "1" })).status).toBe(400);
+    const lista = (await (await get("/api/itens")).json()) as any;
+    expect(lista.grupos).toEqual([{ id: c.id, nome: "Ketchup Heinz" }]);
+    expect(lista.itens.map((i: any) => i.grupoId)).toEqual([c.id, c.id]);
+    const g = (await (await get(`/api/grupos/${c.id}?dias=14`)).json()) as any;
+    expect(g.itens.map((i: any) => i.asin)).toEqual([ASIN, "B000000001"]);
+    expect(g.menorAsin).toBe("B000000001");
+    expect(g.menorPreco).toBe(7);
+    expect(g.itens[1].serie.length).toBe(1);
+    expect((await get(`/api/grupos/${c.id}?dias=5`)).status).toBe(400);
+    expect((await get("/api/grupos/999")).status).toBe(404);
+    expect((await W(`/api/grupos/${c.id}`, "PUT", { nome: "Heinz" })).status).toBe(200);
+    expect((await W(`/api/itens/${ASIN}/grupo`, "PUT", { grupoId: null })).status).toBe(200);
+    expect(store.getByAsin(ASIN)!.grupoId).toBeNull();
+    expect((await W(`/api/grupos/${c.id}`, "DELETE")).status).toBe(200);
+    expect(store.getByAsin("B000000001")).not.toBeNull();
+    expect(store.getByAsin("B000000001")!.grupoId).toBeNull();
+    expect(store.listGrupos()).toEqual([]);
+  });
+
+  test("grupos: proteção de origem e somente leitura; apagar o item não mexe no grupo", async () => {
+    expect((await W("/api/grupos", "POST", { nome: "A" }, { origin: "http://evil.test" })).status).toBe(403);
+    const c = (await (await W("/api/grupos", "POST", { nome: "A" })).json()) as any;
+    await W(`/api/itens/${ASIN}/grupo`, "PUT", { grupoId: c.id });
+    await W(`/api/itens/${ASIN}`, "DELETE");
+    expect(store.listGrupos().length).toBe(1);
+    handle = panelHandler({ store, now: () => NOW, intervalMin: 30, collect: async () => ({ ok: true }) as any, resolve: async () => ({ ok: true, asin: ASIN }), somenteLeitura: true });
+    expect((await W("/api/grupos", "POST", { nome: "B" })).status).toBe(405);
+    expect((await get(`/api/grupos/${c.id}`)).status).toBe(200);
+  });
+
   test("CSRF: exige mesma origem, JSON e cabeçalho do painel", async () => {
     const body = { pausado: true };
     const path = `/api/itens/${ASIN}/pausa`;

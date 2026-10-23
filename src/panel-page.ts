@@ -76,7 +76,7 @@ async function api(m,u,b){const r=await fetch(u,{method:m,headers:{'content-type
 function aviso(t,bad){let e=$('#aviso');if(!e){e=document.createElement('div');e.id='aviso';document.body.appendChild(e)}e.textContent=t;e.className=bad?'bad':'';e.style.display='block';clearTimeout(tm);tm=setTimeout(()=>e.style.display='none',bad?7000:3500)}
 async function rodar(btn,fn){if(btn)btn.disabled=true;try{await fn()}catch(e){aviso(e.message,1)}finally{if(btn)btn.disabled=false}}
 const hashAsin=()=>{const h=location.hash.slice(1);return /^[A-Z0-9]{10}$/.test(h)?h:null};
-const S={itens:[],edit:false,sel:hashAsin(),dias:14,visao:'grafico',det:null,ult:'',saude:null,hover:null};
+const S={itens:[],grupos:[],gsel:null,gdet:null,edit:false,sel:hashAsin(),dias:14,visao:'grafico',det:null,ult:'',saude:null,hover:null};
 function status(i){const a=i.linhas.amazon;
  if(i.pausado)return{k:'paused',t:'Pausado'};
  if(!a.coletas)return{k:'',t:'Aguardando 1ª coleta'};
@@ -101,7 +101,7 @@ function renderSaude(){const s=S.saude;if(!s)return;
   +(s.rodadasFalhasSeguidas>0?'<span class="pill fail">! '+s.rodadasFalhasSeguidas+' rodadas seguidas com falha</span>':'')
   +'<span><b>Itens</b> '+s.itens+(s.pausados?' · '+s.pausados+' pausados':'')+(s.comFalhas?' · <span style="color:var(--bad)">'+s.comFalhas+' com falha</span>':'')+' · '+abaixo+' dentro do alvo</span>'}
 
-const FK='painel-filtros-v1',F0={q:'',st:'',ln:'',min:'',max:'',ord:'num',dir:'asc'};
+const FK='painel-filtros-v1',F0={q:'',st:'',gr:'',ln:'',min:'',max:'',ord:'num',dir:'asc'};
 let F=Object.assign({},F0);try{Object.assign(F,JSON.parse(localStorage.getItem(FK)||'{}'))}catch(e){}
 const salvaF=()=>{try{localStorage.setItem(FK,JSON.stringify(F))}catch(e){}};
 const sem=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -110,6 +110,8 @@ function dist(i){const a=i.linhas.amazon;return a.atual!=null&&a.alvo!=null?(a.a
 function queda(i){const m=i.mini;return m.length>1&&m[0].v?(m[m.length-1].v-m[0].v)/m[0].v*100:null}
 function ultima(i){const m=i.mini;return m.length?Date.parse(m[m.length-1].t):null}
 function preco(i){const a=i.linhas.amazon;if(a.atual!=null)return a.atual;const o=['terceiros','usado'].map(k=>i.linhas[k].atual).filter(v=>v!=null);return o.length?Math.min(...o):null}
+const gmap=()=>Object.fromEntries(S.grupos.map(g=>[String(g.id),g.nome]));
+const gnome=id=>(S.grupos.find(g=>g.id===id)||{}).nome;
 const FILTROS={'':'Todos os status',dentro:'Dentro do alvo',acima:'Acima do alvo',semalvo:'Sem alvo',pausado:'Pausados',falha:'Com falha na coleta',semoferta:'Amazon sem oferta',semcoleta:'Sem coleta ainda'};
 function passa(i){const a=i.linhas.amazon,t=sem(i.titulo)+' '+i.asin.toLowerCase();
  if(F.q&&!F.q.split(/\s+/).every(w=>t.includes(sem(w))))return false;
@@ -118,6 +120,7 @@ function passa(i){const a=i.linhas.amazon,t=sem(i.titulo)+' '+i.asin.toLowerCase
   case 'semalvo':if(a.alvo!=null)return false;break;case 'pausado':if(!i.pausado)return false;break;
   case 'falha':if(!(i.falhasSeguidas>0))return false;break;case 'semoferta':if(!(a.coletas&&a.atual==null))return false;break;
   case 'semcoleta':if(a.coletas)return false;break}
+ if(F.gr==='none'?i.grupoId!=null:F.gr&&String(i.grupoId)!==F.gr)return false;
  if(F.ln&&!i.linhas[F.ln].ligada)return false;
  const p=F.ln?i.linhas[F.ln].atual:preco(i),mn=nv(F.min),mx=nv(F.max);
  if((mn!=null||mx!=null)&&p==null)return false;
@@ -130,12 +133,12 @@ function visiveis(){const f=ORD[F.ord]||ORD.num,sg=F.dir==='desc'?-1:1;
 function initFiltros(){const el=$('#filtros');
  const opt=(o,v)=>Object.entries(o).map(([k,l])=>'<option value="'+k+'"'+(k===v?' selected':'')+'>'+esc(Array.isArray(l)?l[0]:l)+'</option>').join('');
  el.innerHTML='<div class="row"><input type="text" id="fq" placeholder="Buscar por título ou ASIN" style="flex:1" value="'+esc(F.q)+'" aria-label="Buscar"></div>'
-  +'<div class="row"><select id="fst" aria-label="Status">'+opt(FILTROS,F.st)+'</select><select id="fln" aria-label="Linha de preço">'+opt({'':'Qualquer linha',terceiros:'Com Terceiros ligada',usado:'Com Usado ligada'},F.ln)+'</select></div>'
+  +'<div class="row"><select id="fst" aria-label="Status">'+opt(FILTROS,F.st)+'</select><select id="fgr" aria-label="Grupo">'+opt(Object.assign({'':'Todos os grupos',none:'Sem grupo'},gmap()),F.gr)+'</select><select id="fln" aria-label="Linha de preço">'+opt({'':'Qualquer linha',terceiros:'Com Terceiros ligada',usado:'Com Usado ligada'},F.ln)+'</select></div>'
   +'<div class="row"><span class="mut">Preço</span><input type="text" class="val" id="fmin" inputmode="decimal" placeholder="mín" value="'+esc(F.min)+'" aria-label="Preço mínimo"><input type="text" class="val" id="fmax" inputmode="decimal" placeholder="máx" value="'+esc(F.max)+'" aria-label="Preço máximo"></div>'
   +'<div class="row"><select id="ford" aria-label="Ordenar por">'+opt(ORD,F.ord)+'</select><button type="button" class="btn sm" id="fdir" title="Inverter ordem">'+(F.dir==='desc'?'↓ Decrescente':'↑ Crescente')+'</button><button type="button" class="btn sm" id="flimpa">Limpar</button></div>'
-  +'<div class="mut" id="fcount"></div>';
- const mudou=()=>{F.q=$('#fq').value;F.st=$('#fst').value;F.ln=$('#fln').value;F.min=$('#fmin').value.trim();F.max=$('#fmax').value.trim();F.ord=$('#ford').value;salvaF();renderEsq()};
- for(const id of ['fq','fmin','fmax'])$('#'+id).oninput=mudou;for(const id of ['fst','fln','ford'])$('#'+id).onchange=mudou;
+  +'<div class="mut" id="fcount"></div><div id="fagr"></div>';
+ const mudou=()=>{F.q=$('#fq').value;F.st=$('#fst').value;F.gr=$('#fgr').value;F.ln=$('#fln').value;F.min=$('#fmin').value.trim();F.max=$('#fmax').value.trim();F.ord=$('#ford').value;salvaF();renderEsq()};
+ for(const id of ['fq','fmin','fmax'])$('#'+id).oninput=mudou;for(const id of ['fst','fgr','fln','ford'])$('#'+id).onchange=mudou;
  $('#fdir').onclick=e=>{F.dir=F.dir==='desc'?'asc':'desc';e.target.textContent=F.dir==='desc'?'↓ Decrescente':'↑ Crescente';salvaF();renderEsq()};
  $('#flimpa').onclick=()=>{F=Object.assign({},F0);salvaF();initFiltros();renderEsq()}}
 function renderEsq(){let h='';
@@ -143,7 +146,7 @@ function renderEsq(){let h='';
   +'<h3 style="font-size:14px;margin:14px 0 4px">Importar do Keepa</h3><div class="mut">Em keepa.com/manage use o botão de exportar (CSV) e escolha o arquivo aqui. Só ASINs; o alvo você define depois.</div><input type="file" id="arq" accept=".csv,.txt,text/csv,text/plain"><div id="imp"></div></div></details>';
  const add=h;h='<div class="lista">';const vis=visiveis();
  for(const i of vis){const a=i.linhas.amazon,st=status(i);
-  const tags=(i.silenciadoAte?'<span class="pill">alertas silenciados</span>':'')+(i.falhasSeguidas>0?'<span class="pill fail">falha na coleta</span>':'');
+  const tags=(i.silenciadoAte?'<span class="pill">alertas silenciados</span>':'')+(i.falhasSeguidas>0?'<span class="pill fail">falha na coleta</span>':'')+(i.grupoId!=null&&gnome(i.grupoId)?'<span class="pill">▦ '+esc(gnome(i.grupoId))+'</span>':'');
   const cor=a.coletas?COR.amazon:COR.terceiros;
   const al=a.alvo,chips=a.atual!=null?[5,10,15].map(p=>{const v=Math.round(a.atual*(1-p/100));return '<button type="button" class="btn sm" data-cv="'+v+'" title="'+brl(v)+'">−'+p+'%</button>'}).join(''):'';
   const alv=S.edit?'<div class="alv" data-asin="'+esc(i.asin)+'"><span class="mut">Alvo</span><input type="text" class="val" inputmode="decimal" placeholder="ex.: 449" value="'+(al!=null?String(al).replace('.',','):'')+'" aria-label="Alvo da Amazon do item '+i.num+'"><button type="button" class="btn sm pri" data-cs="1">Definir</button>'+chips+(al!=null?'<button type="button" class="btn sm" data-cx="1" title="Remover alvo">×</button>':'')+'</div>':'';
@@ -155,6 +158,10 @@ function renderEsq(){let h='';
  else if(!vis.length)h+='<div class="cd vazio">Nenhum item com esses filtros.</div>';
  $('#addbox').innerHTML=add;$('#lst').innerHTML=h;
  const ct=$('#fcount');if(ct)ct.textContent=vis.length+' de '+S.itens.length+' itens';
+ const ag=$('#fagr');if(ag){ag.innerHTML=S.edit&&F.q.trim()&&vis.length>=2&&vis.length<=30?'<button type="button" class="btn sm" id="agr">▦ Agrupar os '+vis.length+' itens desta busca</button>':'';
+  const b=$('#agr');if(b)b.onclick=()=>{const n=(prompt('Nome do grupo para estes '+vis.length+' itens:',F.q.trim())||'').trim();if(!n)return;
+   const mov=vis.filter(i=>i.grupoId!=null).length;if(mov&&!confirm(mov+' desses itens já estão em outro grupo e serão movidos. Continuar?'))return;
+   rodar(b,async()=>{const g=await api('POST','/api/grupos',{nome:n});for(const i of vis)await api('PUT','/api/itens/'+i.asin+'/grupo',{grupoId:g.id});aviso('Grupo criado com '+vis.length+' itens.');S.sel=null;F.q='';$('#fq').value='';F.gr=String(g.id);salvaF();abrirGrupo(g.id);await carregar()})}}
  $('#esq').querySelectorAll('.item').forEach(e=>e.onclick=()=>selecionar(e.dataset.asin));
  $('#lst').querySelectorAll('.alv').forEach(c=>{const asin=c.dataset.asin,inp=c.querySelector('input'),
   set=(b,val,msg)=>rodar(b,async()=>{await api('PUT','/api/itens/'+asin+'/alvo',{linha:'amazon',valor:val});aviso(msg);await carregar()});
@@ -230,11 +237,12 @@ function tabelaColetas(d){const ts=tempos(d).slice(-24).reverse(),ls=LK.filter(k
 
 function melhores(of){const m={};for(const o of of){if(o.descartada)continue;const t=o.preco+(o.frete||0);if(m[o.condicao]==null||t<m[o.condicao])m[o.condicao]=t}return m}
 const libera=d=>{const t=d.consultaLiberadaEm?new Date(d.consultaLiberadaEm).getTime()-Date.now():0;return t>0?Math.ceil(t/60000):0};
-function renderDir(){const d=S.det,it=S.itens.find(x=>x.asin===S.sel);
+function renderDir(){if(S.gsel!=null)return renderGrupo();const d=S.det,it=S.itens.find(x=>x.asin===S.sel);
  if(!d||!it){$('#dir').innerHTML='<div class="vazio">'+(S.itens.length?'Selecione um item.':'Nenhum item selecionado.')+'</div>';return}
  const L=d.linhas,st=status(it),url=d.url&&d.url.startsWith('https:'+'//www.amazon.com.br/')?d.url:null;
  let h='<div class="dh"><div style="display:flex;gap:14px;min-width:0">'+foto(it)+'<div><h2>'+esc(d.titulo||d.asin)+'</h2><div class="meta"><span class="mono">#'+d.num+' · '+esc(d.asin)+'</span>'+pill(st)+(d.silenciadoAte?'<span class="pill">alertas silenciados até '+esc(new Date(d.silenciadoAte).toLocaleString('pt-BR'))+'</span>':'')+'</div></div></div>';
  h+='<div class="act">'+(url?'<a class="btn sm" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Abrir na Amazon</a>':'')+(S.edit?'<button class="btn sm" data-q="1"'+(libera(d)?' disabled':'')+'>'+(libera(d)?'Consultar em '+libera(d)+' min':'Consultar agora')+'</button><button class="btn sm" data-p="1">'+(d.pausado?'Retomar':'Pausar')+'</button><button class="btn sm" data-s="1">'+(d.silenciadoAte?'Reativar alertas':'Silenciar 24 h')+'</button><button class="btn sm bad" data-r="1">Remover</button>':'')+'</div></div>';
+ h+='<div class="row" style="margin-top:12px"><span class="mut">Grupo</span>'+(S.edit?'<select id="dg" aria-label="Grupo do item"><option value="">Sem grupo</option>'+S.grupos.map(g=>'<option value="'+g.id+'"'+(g.id===it.grupoId?' selected':'')+'>'+esc(g.nome)+'</option>').join('')+'<option value="new">+ Novo grupo…</option></select>':'<b>'+esc(gnome(it.grupoId)||'—')+'</b>')+(it.grupoId!=null?'<button type="button" class="btn sm" data-vg="1">Ver grupo</button>':'')+'</div>';
  h+='<div class="tw"><table><tr><th>Linha de preço</th><th class="n">Agora</th><th class="n">Alvo</th><th class="n">Mín 30 d</th><th class="n">Máx 30 d</th><th class="n">Variação</th>'+(S.edit?'<th>Coleta</th>':'')+'</tr>';
  LK.forEach((k,idx)=>{const l=L[k],on=l.ligada;
   h+='<tr data-k="'+k+'"><td><i class="key" style="--c:'+COR[k]+'"></i><b style="font-weight:600">'+NOME[k]+'</b>'+(idx===0?' <span class="pill">principal</span>':'')+'</td>'
@@ -254,7 +262,11 @@ function renderDir(){const d=S.det,it=S.itens.find(x=>x.asin===S.sel);
  dir.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{S.dias=+b.dataset.n;S.hover=null;detalhe()});
  dir.querySelectorAll('[data-vz]').forEach(b=>b.onclick=()=>{S.visao=b.dataset.vz;S.hover=null;renderDir()});
  if(S.visao==='grafico'){grafico(d);if(window.ResizeObserver){S.ro&&S.ro.disconnect();S.ro=new ResizeObserver(()=>grafico(d));S.ro.observe($('#chart'))}}
+ const vg=dir.querySelector('[data-vg]');if(vg)vg.onclick=()=>abrirGrupo(it.grupoId);
  if(!S.edit)return;
+ const dg=dir.querySelector('#dg');if(dg)dg.onchange=()=>rodar(dg,async()=>{let v=dg.value;
+  if(v==='new'){const n=(prompt('Nome do novo grupo:')||'').trim();if(!n){dg.value=it.grupoId==null?'':String(it.grupoId);return}v=String((await api('POST','/api/grupos',{nome:n})).id)}
+  await api('PUT',A+'/grupo',{grupoId:v===''?null:Number(v)});aviso(v===''?'Item fora de grupos.':'Item colocado no grupo.');await carregar()});
  dir.querySelectorAll('[data-alvo]').forEach(i=>{const k=i.dataset.alvo,salvar=()=>{const t=i.value.trim();if((t===''?null:t)===(L[k].alvo!=null?String(L[k].alvo).replace('.',','):null))return;rodar(i,async()=>{await api('PUT',A+'/alvo',{linha:k,valor:t===''?null:t});aviso(t===''?'Alvo removido.':'Alvo salvo.');await carregar()})};
   i.onchange=salvar;i.onkeydown=e=>{if(e.key==='Enter')i.blur()}});
  dir.querySelectorAll('[data-linha]').forEach(b=>b.onchange=()=>rodar(b,async()=>{const k=b.dataset.linha,on=b.checked;if(on)aviso('Lendo o produto…');const j=await api('PUT',A+'/linhas',{linha:k,ligada:on});aviso(on?(j.leitura==='ok'?'Linha ligada.':'Linha ligada, mas não consegui ler agora; entra na próxima rodada.'):'Linha desligada. O histórico fica guardado.',on&&j.leitura!=='ok');await carregar()}));
@@ -263,13 +275,42 @@ function renderDir(){const d=S.det,it=S.itens.find(x=>x.asin===S.sel);
  dir.querySelector('[data-s]').onclick=e=>rodar(e.target,async()=>{await api('PUT',A+'/silencio',{silenciado:!d.silenciadoAte});aviso(d.silenciadoAte?'Alertas reativados.':'Sem alertas por 24 h.');await carregar()});
  dir.querySelector('[data-r]').onclick=e=>{if(!confirm('Remover este item e apagar o histórico?'))return;rodar(e.target,async()=>{await api('DELETE',A);aviso('Item removido. Os demais foram renumerados.');S.sel=null;S.ult='';await carregar()})}}
 
-async function detalhe(){if(!S.sel){S.det=null;renderDir();return}
+const GC=['#2a78d6','#eb6834','#1baf7a','#8a5cd6','#c9a100','#d6407a','#5c6b78','#0aa5b5'];
+function abrirGrupo(id){S.gsel=id;S.gdet=null;S.hover=null;F.gr=String(id);salvaF();renderEsq();detalhe();if(innerWidth<=900)$('#dir').scrollIntoView({behavior:'smooth',block:'start'})}
+function grupoGrafico(g){const host=$('#gchart');if(!host)return;const W=host.clientWidth||840,H=270,L=62,R=14,T=14,B=28,x0=Date.parse(g.desde),x1=Date.now();
+ const vals=g.itens.flatMap(i=>i.serie.map(p=>p.v));if(!vals.length){host.innerHTML='<p class="mut">Sem coletas neste período.</p>';return}
+ let y0=Math.min(...vals),y1=Math.max(...vals);const sp=Math.max(y1-y0,y1*.05);y0-=sp*.12;y1+=sp*.12;
+ const pw=W-L-R,ph=H-T-B,X=t=>L+(Date.parse(t)-x0)/(x1-x0)*pw,Y=v=>T+(1-(v-y0)/(y1-y0))*ph;let s='';
+ for(let i=0;i<=4;i++){const p=y0+(y1-y0)*i/4,y=Y(p);s+='<line x1="'+L+'" x2="'+(L+pw)+'" y1="'+y.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="var(--grid)"/><text x="'+(L-8)+'" y="'+(y+4).toFixed(1)+'" text-anchor="end" font-size="11.5" fill="var(--mut)">R$ '+Math.round(p).toLocaleString('pt-BR')+'</text>'}
+ s+='<line x1="'+L+'" x2="'+(L+pw)+'" y1="'+(T+ph)+'" y2="'+(T+ph)+'" stroke="var(--axis)"/>';
+ const passo=S.dias<=7?1:S.dias<=14?2:5;
+ for(let n=0;n*passo<=S.dias;n++){const t=x1-n*passo*86400000;if(t<x0)break;const x=L+(t-x0)/(x1-x0)*pw;s+='<text x="'+x.toFixed(1)+'" y="'+(H-8)+'" text-anchor="'+(n===0?'end':'middle')+'" font-size="11.5" fill="var(--mut)">'+(n===0?'agora':dm(t))+'</text>'}
+ g.itens.forEach((it,k)=>{const pts=it.serie;if(!pts.length)return;const c=GC[k%GC.length],l=pts[pts.length-1];
+  s+='<path d="'+pts.map((p,i)=>i?'H'+X(p.t).toFixed(1)+'V'+Y(p.v).toFixed(1):'M'+X(p.t).toFixed(1)+','+Y(p.v).toFixed(1)).join('')+'" fill="none" stroke="'+c+'" stroke-width="2" stroke-linejoin="round"/><circle cx="'+X(l.t).toFixed(1)+'" cy="'+Y(l.v).toFixed(1)+'" r="4.5" fill="'+c+'" stroke="var(--sf)" stroke-width="2"><title>'+esc((it.titulo||it.asin)+': '+brl(l.v))+'</title></circle>'});
+ host.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" height="'+H+'" role="img" aria-label="Histórico de preços de cada item do grupo">'+s+'</svg>'}
+function renderGrupo(){const g=S.gdet,dir=$('#dir');if(!g){dir.innerHTML='<div class="vazio">Carregando…</div>';return}
+ let h='<div class="dh"><div><h2>Grupo: '+esc(g.nome)+'</h2><div class="meta"><span>'+g.itens.length+(g.itens.length===1?' item':' itens')+'</span>'+(g.menorPreco!=null?'<span>Menor preço agora <b>'+brl(g.menorPreco)+'</b></span>':'')+'</div></div><div class="act">'+(S.edit?'<button class="btn sm" data-gr="1">Renomear</button><button class="btn sm bad" data-gd="1">Apagar grupo</button>':'')+'</div></div>';
+ if(!g.itens.length)h+='<p class="mut" style="margin-top:14px">Nenhum item neste grupo. Abra um item e escolha este grupo no campo Grupo.</p>';
+ else{h+='<div class="tw"><table><tr><th>Item</th><th class="n">Agora</th><th class="n">vs. menor</th><th class="n">Alvo</th><th class="n">Mín</th><th class="n">Máx</th></tr>';
+  g.itens.forEach((it,k)=>{const menor=it.asin===g.menorAsin,dv=it.atual!=null&&g.menorPreco?(it.atual-g.menorPreco)/g.menorPreco*100:null;
+   h+='<tr class="'+(menor?'best':'')+'"><td style="white-space:normal;min-width:200px"><i class="key" style="--c:'+GC[k%GC.length]+'"></i><a href="#'+esc(it.asin)+'" data-op="'+esc(it.asin)+'">'+it.num+'. '+esc(it.titulo||it.asin)+'</a>'+(it.pausado?' <span class="pill paused">Pausado</span>':'')+(menor?' <span class="pill below">menor</span>':'')+'<div class="mut">'+(it.linha==='amazon'?'Amazon':'Terceiros')+'</div></td><td class="n num">'+(it.atual!=null?brl(it.atual):'<span class="mut">sem oferta</span>')+'</td><td class="n num">'+(dv==null?'—':menor?'—':pct(dv))+'</td><td class="n num">'+(it.alvo!=null?brl(it.alvo):'—')+'</td><td class="n num">'+brl(it.min)+'</td><td class="n num">'+brl(it.max)+'</td></tr>'});
+  h+='</table></div>';
+  h+='<div class="bar"><div class="seg">'+[7,14,30].map(n=>'<button type="button" data-n="'+n+'" aria-pressed="'+(n===S.dias)+'">'+n+' dias</button>').join('')+'</div></div><div class="chart" id="gchart"></div><div class="leg">'+g.itens.map((it,k)=>'<span><i class="key" style="--c:'+GC[k%GC.length]+'"></i>'+it.num+'. '+esc((it.titulo||it.asin).slice(0,40))+'</span>').join('')+'</div>'}
+ dir.innerHTML=h;
+ dir.querySelectorAll('[data-op]').forEach(a=>a.onclick=e=>{e.preventDefault();selecionar(a.dataset.op)});
+ dir.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{S.dias=+b.dataset.n;detalhe()});
+ grupoGrafico(g);
+ const gr=dir.querySelector('[data-gr]');if(gr)gr.onclick=()=>{const n=(prompt('Novo nome do grupo:',g.nome)||'').trim();if(!n||n===g.nome)return;rodar(gr,async()=>{await api('PUT','/api/grupos/'+g.id,{nome:n});aviso('Grupo renomeado.');await carregar()})};
+ const gd=dir.querySelector('[data-gd]');if(gd)gd.onclick=()=>{if(!confirm('Apagar o grupo? Os itens continuam rastreados, só ficam sem grupo.'))return;rodar(gd,async()=>{await api('DELETE','/api/grupos/'+g.id);aviso('Grupo apagado.');S.gsel=null;F.gr='';salvaF();await carregar()})}}
+async function detalhe(){if(S.gsel!=null){try{S.gdet=await get('/api/grupos/'+S.gsel+'?dias='+S.dias)}catch(e){S.gdet=null;S.gsel=null}renderDir();return}
+ if(!S.sel){S.det=null;renderDir();return}
  try{S.det=await get('/api/itens/'+S.sel+'?dias='+S.dias)}catch(e){S.det=null;S.sel=null}
  renderDir()}
-function selecionar(asin){S.sel=asin;S.hover=null;try{history.replaceState(null,'','#'+asin)}catch(e){}renderEsq();detalhe();if(innerWidth<=900)$('#dir').scrollIntoView({behavior:'smooth',block:'start'})}
-async function carregar(){const d=await get('/api/itens');S.itens=d.itens;S.edit=!!d.edicao;S.saude=d.saude;
+function selecionar(asin){S.sel=asin;S.gsel=null;S.hover=null;try{history.replaceState(null,'','#'+asin)}catch(e){}renderEsq();detalhe();if(innerWidth<=900)$('#dir').scrollIntoView({behavior:'smooth',block:'start'})}
+async function carregar(){const d=await get('/api/itens');S.itens=d.itens;S.grupos=d.grupos||[];if(S.gsel!=null&&!S.grupos.some(g=>g.id===S.gsel))S.gsel=null;S.edit=!!d.edicao;S.saude=d.saude;
  if(!S.itens.some(i=>i.asin===S.sel))S.sel=S.itens.length?S.itens[0].asin:null;
- renderSaude();renderEsq();await detalhe()}
+ if(F.gr&&F.gr!=='none'&&!S.grupos.some(g=>String(g.id)===F.gr))F.gr='';
+ initFiltros();renderSaude();renderEsq();await detalhe()}
 initFiltros();
 carregar().catch(()=>{$('#dir').innerHTML='<div class="vazio">Não foi possível carregar os dados.</div>'});
 setInterval(()=>{if(document.hidden||document.activeElement&&/INPUT|TEXTAREA/.test(document.activeElement.tagName))return;carregar().catch(()=>{})},120000);
