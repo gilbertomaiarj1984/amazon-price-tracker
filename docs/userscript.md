@@ -70,7 +70,7 @@ Abra de novo o link bruto do script (seção Instalar) e clique em **Atualizar**
 
 Com um segundo token (`USERSCRIPT_TOKEN`) a janela da página do produto passa a mostrar o mesmo que o painel e deixa **definir o alvo** e **rastrear** o item sem sair da Amazon:
 
-- borda e título coloridos pelo alvo (verde: dentro; laranja: até 20% acima; vermelho: mais de 20% acima), estrela, grupo e número do item;
+- borda e título coloridos pelo alvo único do item, comparado com o menor preço entre as fontes (verde: dentro; laranja: até 20% acima; vermelho: mais de 20% acima), estrela, grupo e número do item;
 - preço por linha (Amazon, Terceiros e Usado, só as ligadas), gráfico de 30 dias, mínimo, máximo e média;
 - "atualizado há N min" (última coleta);
 - campo **Alvo R$** com *Salvar* (Enter também salva) e *Remover alvo*; item não rastreado ganha o botão **Rastrear este produto**.
@@ -122,7 +122,7 @@ curl -s -w '\n%{http_code}\n' -H "x-us-token: SEU_TOKEN" https://precos.143-95-2
 
 **3. Tampermonkey**
 
-1. Abra o link bruto do script (seção Instalar) e clique em **Atualizar** (versão 3.0.0).
+1. Abra o link bruto do script (seção Instalar) e clique em **Atualizar** (versão 3.1.0).
 2. Abra uma página de produto da Amazon, clique no ícone do Tampermonkey > *Rastreador de preços* > **Definir token do rastreador (alvo e detalhes)**, cole o `USERSCRIPT_TOKEN` e recarregue a página.
 3. Na janela, digite o alvo (ex.: `149,90`) e clique em **Salvar**.
 

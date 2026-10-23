@@ -4,8 +4,6 @@ import { productUrl } from "./amazon/fetch.ts";
 import type { Product, Store } from "./db.ts";
 import { parseUserNumber } from "./numbers.ts";
 import { buildView } from "./view.ts";
-import { LINE_KEYS } from "./types.ts";
-import type { LineKey } from "./types.ts";
 import type { PanelDeps } from "./panel.ts";
 import { panelSelo } from "./panel.ts";
 
@@ -67,6 +65,9 @@ export function userscriptItem(store: Store, p: Product, now: Date, escrita: boo
     estrela: p.estrela,
     grupo: g ? { id: g.id, nome: g.nome } : null,
     linhas: v.linhas,
+    alvo: v.alvo,
+    menor: v.menor,
+    menorLinha: v.menorLinha,
     ultimaColeta: store.getUltimaColeta(p.id),
     edicao: escrita,
   };
@@ -122,12 +123,9 @@ export function userscriptHandler(d: PanelDeps, act: Actions | null): (req: Requ
     }
 
     if (!p) return json({ erro: "não encontrado" }, 404);
-    const linha = (body["linha"] ?? "amazon") as LineKey;
-    if (!(LINE_KEYS as readonly string[]).includes(linha)) return json({ erro: `linha deve ser: ${LINE_KEYS.join(", ")}` }, 400);
     const valor = alvoOf(body["valor"]);
     if (valor === undefined) return json({ erro: `valor deve ser um preço entre 0,01 e ${MAX_ALVO}` }, 400);
-    const r = act.setAlvo(p, linha, valor);
-    if (!r.ok) return json({ erro: "Essa linha está desligada." }, 409);
+    const r = act.setAlvo(p, valor);
     return json({ ...userscriptItem(d.store, d.store.getById(p.id)!, d.now(), true), dentroDoAlvo: r.dentro });
   };
 }
