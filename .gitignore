@@ -6,3 +6,4 @@ data/
 tests/fixtures/real/
 dist/
 .DS_Store
+links.txt

@@ -1,0 +1,5 @@
+# Um link por linha (links curtos amzn.to e a.co também valem).
+# Troque por produtos reais; estes ASINs são só de exemplo.
+https://www.amazon.com.br/dp/B000000001
+https://www.amazon.com.br/dp/B000000002
+https://www.amazon.com.br/dp/B000000003
