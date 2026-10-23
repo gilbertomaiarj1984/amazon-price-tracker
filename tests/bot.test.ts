@@ -66,14 +66,14 @@ describe("cadastro por link", () => {
   test("responder um número define o alvo", async () => {
     await bot.handleText(LINK);
     await bot.handleText("15,50");
-    expect(store.getAlvo(1, "amazon")).toBe(15.5);
+    expect(store.getAlvo(1)).toBe(15.5);
     expect(last().html).toContain("R$ 15,50");
   });
 
   test("botão de sugestão define o alvo", async () => {
     await bot.handleText(LINK);
     await bot.handleCallback("t:1:18");
-    expect(store.getAlvo(1, "amazon")).toBe(18);
+    expect(store.getAlvo(1)).toBe(18);
   });
 
   test("alvo acima do preço atual avisa que já está dentro", async () => {
@@ -85,7 +85,7 @@ describe("cadastro por link", () => {
   test("'sem alvo por enquanto' não define nada e libera a conversa", async () => {
     await bot.handleText(LINK);
     await bot.handleCallback("nt:1");
-    expect(store.getAlvo(1, "amazon")).toBeNull();
+    expect(store.getAlvo(1)).toBeNull();
     await bot.handleText("200");
     expect(last().html).toContain("Não entendi");
   });
@@ -162,14 +162,12 @@ describe("comandos", () => {
     expect(last().html).toContain("Amazon</b>  R$ 20,10");
     expect(last().html).toContain("1 coleta");
   });
-  test("/alvo com e sem linha, e linha desligada", async () => {
+  test("/alvo é um só por item; palavra de linha é ignorada", async () => {
     await bot.handleText("/alvo 1 18,5");
-    expect(store.getAlvo(1, "amazon")).toBe(18.5);
+    expect(store.getAlvo(1)).toBe(18.5);
+    expect(last().html).toContain("qualquer fonte");
     await bot.handleText("/alvo 1 terceiros 30");
-    expect(last().html).toContain("está desligada");
-    store.setLinhaOn(1, "terceiros", true);
-    await bot.handleText("/alvo 1 terceiros 30");
-    expect(store.getAlvo(1, "terceiros")).toBe(30);
+    expect(store.getAlvo(1)).toBe(30);
     await bot.handleText("/alvo 1 abc");
     expect(last().html).toContain("Use:");
   });

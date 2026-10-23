@@ -1,10 +1,11 @@
-import { evaluate, FAILURE_THRESHOLD, shouldAlertFailures } from "./alerts.ts";
-import type { AlertEvent } from "./alerts.ts";
+import { evaluate, evaluateAlvo, FAILURE_THRESHOLD, shouldAlertFailures } from "./alerts.ts";
+import type { AlertEvent, Candidato } from "./alerts.ts";
 import { fetchHtml, offersUrl, pickUserAgent, productUrl } from "./amazon/fetch.ts";
 import type { Fetched } from "./amazon/fetch.ts";
 import { detectBlock, parseOffersPanel, parseProductPage } from "./amazon/parse.ts";
 import type { Product, Store } from "./db.ts";
 import { deriveLines } from "./lines.ts";
+import type { Fallback } from "./lines.ts";
 import { LINE_KEYS } from "./types.ts";
 import type { BlockKind, LineKey, LinePoint, Offer, ProductPage } from "./types.ts";
 
@@ -81,15 +82,21 @@ async function collectInner(store: Store, product: Product, deps: CollectDeps): 
   const enabled = LINE_KEYS.filter((k) => k === "amazon" || (k === "terceiros" ? fresh.terceirosOn : fresh.usadoOn));
 
   const alertas: AlertItem[] = [];
+  const candidatos: Candidato[] = [];
+  const pontos = {} as Partial<Record<LineKey, { preco: number; vendedor: string | null; fb: Fallback | null }>>;
   const nextStates = enabled.map((linha) => {
     // Sem Amazon, o alvo da linha Amazon vale para o melhor terceiro, e o alerta diz que ele é de terceiro.
     const fb = linha === "amazon" ? fallback : null;
     const ponto = fb ? { linha, preco: fb.preco, vendedor: fb.vendedor } : (points[linha] ?? null);
+    const minimoAnterior = store.minBefore(fresh.id, fb ? "terceiros" : linha, at);
+    if (ponto) {
+      candidatos.push({ linha, preco: ponto.preco, minimoAnterior });
+      pontos[linha] = { preco: ponto.preco, vendedor: ponto.vendedor, fb };
+    }
     const r = evaluate({
       linha,
       preco: ponto?.preco ?? null,
-      alvo: store.getAlvo(fresh.id, linha),
-      minimoAnterior: store.minBefore(fresh.id, fb ? "terceiros" : linha, at),
+      minimoAnterior,
       avisarNovoMinimo: !fb,
       prev: store.getAlertState(fresh.id, linha),
     });
@@ -99,6 +106,17 @@ async function collectInner(store: Store, product: Product, deps: CollectDeps): 
     for (const evento of eventos) alertas.push({ product: fresh, evento, vendedor: ponto?.vendedor ?? null, ...(fb ? { terceiro: { envio: fb.envio } } : {}) });
     return { linha, next: r.next };
   });
+
+  // Alvo único: vale para a menor oferta entre as fontes. O aviso de alvo substitui o de novo mínimo da mesma linha.
+  const amazonState = nextStates.find((s) => s.linha === "amazon")!;
+  const alvo = evaluateAlvo({ candidatos, alvo: store.getAlvo(fresh.id), ultimoAlertado: amazonState.next.ultimoAlertado });
+  amazonState.next.ultimoAlertado = alvo.ultimoAlertado;
+  if (alvo.evento) {
+    const ponto = pontos[alvo.evento.linha]!;
+    const i = alertas.findIndex((a) => a.evento.tipo === "novo_minimo" && a.evento.linha === alvo.evento!.linha);
+    if (i >= 0) alertas.splice(i, 1);
+    alertas.push({ product: fresh, evento: alvo.evento, vendedor: ponto.vendedor, ...(ponto.fb ? { terceiro: { envio: ponto.fb.envio } } : {}) });
+  }
 
   store.saveSnapshot(fresh.id, at, [...offers.map((o) => ({ ...o })), ...descartadas.map((o) => ({ ...o, descartada: true }))], points);
   store.setFallback(fresh.id, fallback);

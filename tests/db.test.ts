@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Store } from "../src/db.ts";
 
 let s: Store;
@@ -23,15 +26,39 @@ describe("Store", () => {
     expect(s.numberOf(c.id)).toBe(2);
     expect(s.byNumber(1)?.asin).toBe("B000000002");
   });
-  test("alvo por linha, e trocar o alvo reabre o alerta", () => {
+  test("alvo único por item, e trocar o alvo reabre o alerta", () => {
     const p = s.addProduct("B000000001", "A", T(1));
-    s.setAlvo(p.id, "amazon", 199);
+    s.setAlvo(p.id, 199);
     s.setAlertState(p.id, "amazon", { ultimoAlertado: 190, disponivel: true });
-    s.setAlvo(p.id, "amazon", 150);
-    expect(s.getAlvo(p.id, "amazon")).toBe(150);
+    s.setAlvo(p.id, 150);
+    expect(s.getAlvo(p.id)).toBe(150);
     expect(s.getAlertState(p.id, "amazon").ultimoAlertado).toBeNull();
-    s.setAlvo(p.id, "amazon", null);
-    expect(s.getAlvo(p.id, "amazon")).toBeNull();
+    s.setAlvo(p.id, null);
+    expect(s.getAlvo(p.id)).toBeNull();
+  });
+  test("migração: alvos por linha viram um só (Amazon, senão o menor), e roda de novo sem efeito", () => {
+    const dir = mkdtempSync(join(tmpdir(), "alvo-"));
+    const path = join(dir, "t.db");
+    const a = new Store(path);
+    const p1 = a.addProduct("B000000001", "A", T(1));
+    const p2 = a.addProduct("B000000002", "B", T(1));
+    const p3 = a.addProduct("B000000003", "C", T(1));
+    const ins = (id: number, linha: string, v: number) => a.db.query("INSERT OR REPLACE INTO alvos (product_id, linha, preco_alvo) VALUES (?, ?, ?)").run(id, linha, v);
+    a.db.exec("DELETE FROM alvos");
+    ins(p1.id, "amazon", 200); ins(p1.id, "terceiros", 150); // Amazon vence
+    ins(p2.id, "terceiros", 180); ins(p2.id, "usado", 120); // menor dos outros
+    a.setAlertState(p2.id, "terceiros", { ultimoAlertado: 130, disponivel: true });
+    a.close();
+    for (let i = 0; i < 2; i++) {
+      const b = new Store(path);
+      expect(b.getAlvo(p1.id)).toBe(200);
+      expect(b.getAlvo(p2.id)).toBe(120);
+      expect(b.getAlvo(p3.id)).toBeNull();
+      expect(b.getAlertState(p2.id, "terceiros").ultimoAlertado).toBeNull();
+      expect((b.db.query("SELECT COUNT(*) AS n FROM alvos").get() as { n: number }).n).toBe(2);
+      b.close();
+    }
+    rmSync(dir, { recursive: true });
   });
   test("snapshot guarda ofertas brutas e linhas; estatísticas", () => {
     const p = s.addProduct("B000000001", "A", T(1));
@@ -58,7 +85,7 @@ describe("Store", () => {
   });
   test("remover apaga o histórico junto", () => {
     const p = s.addProduct("B000000001", "A", T(1));
-    s.setAlvo(p.id, "amazon", 100);
+    s.setAlvo(p.id, 100);
     s.saveSnapshot(p.id, T(1), [], { amazon: { linha: "amazon", preco: 1, vendedor: null } });
     s.remove(p.id);
     expect((s.db.query("SELECT COUNT(*) AS n FROM price_lines").get() as { n: number }).n).toBe(0);

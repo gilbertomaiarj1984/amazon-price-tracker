@@ -10,7 +10,7 @@ Painel com tudo o que o bot do Telegram faz, mais a leitura: lista de itens (min
 | `/lista` | a própria lista, com preço atual, alvo e mini-gráfico |
 | `/historico N` | clicar no item: gráfico de 7/14/30 dias, mínimo, máximo, variação |
 | `/linhas N` | **Linhas de preço**: ligar/desligar Terceiros e Usado (lê o produto na hora) |
-| `/alvo N valor` | **Preço-alvo** por linha, com campo para salvar e botão para remover |
+| `/alvo N valor` | **Preço-alvo** único do item (vale para Amazon, Terceiros e Usado), com campo para salvar e botão para remover |
 | `/pausar N` | **Pausar/Retomar coletas** |
 | `/estrela N` | **Estrela de prioridade** (coletado primeiro em cada rodada) |
 | botão **Consultar agora** (também no card do `/item N`) | Lê a Amazon na hora, só aquele item |

@@ -8,11 +8,11 @@ Rastreador pessoal de preços da Amazon Brasil. Você cola o link no bot do Tele
 
 ## Como funciona
 
-Cada produto tem até três **linhas de preço**, cada uma com histórico e alvo próprios:
+Cada produto tem até três **linhas de preço**, cada uma com histórico próprio, e **um alvo único por item** que vale para qualquer linha (o aviso e as cores usam o menor preço entre elas):
 
 | Linha | O que é |
 |---|---|
-| **Amazon** (principal) | Oferta vendida pela própria Amazon. Fica sem dado quando a Amazon não vende; nunca é preenchida com preço de terceiro na série. Nesse caso o card, o painel e os alertas mostram o **melhor terceiro novo** (rotulado "Terceiro", com vendedor e FBA ou não), o alvo da linha Amazon vale para ele, e ele é gravado na série Terceiros. Não custa requisição extra: o painel de ofertas já é lido sempre que a caixa de compra não é da Amazon. |
+| **Amazon** (principal) | Oferta vendida pela própria Amazon. Fica sem dado quando a Amazon não vende; nunca é preenchida com preço de terceiro na série. Nesse caso o card, o painel e os alertas mostram o **melhor terceiro novo** (rotulado "Terceiro", com vendedor e FBA ou não), o alvo do item vale para ele, e ele é gravado na série Terceiros. Não custa requisição extra: o painel de ofertas já é lido sempre que a caixa de compra não é da Amazon. |
 | **Terceiros (novo)** | Menor preço anunciado entre vendedores terceiros, condição nova. |
 | **Usado** | Menor preço anunciado entre ofertas usadas. |
 
@@ -37,7 +37,7 @@ scripts/spike.ts      teste de bloqueio, para rodar no VPS
 
 ## Comandos do bot
 
-Cole o link de um produto para rastrear. `/item N`, `/historico N`, `/linhas N`, `/alvo N [linha] valor`, `/pausar N`, `/estrela N`, `/remover N`, `/ajuda`.
+Cole o link de um produto para rastrear. `/item N`, `/historico N`, `/linhas N`, `/alvo N valor`, `/pausar N`, `/estrela N`, `/remover N`, `/ajuda`.
 
 ## Rodar
 

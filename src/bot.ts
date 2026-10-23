@@ -8,7 +8,6 @@ import * as fmt from "./format.ts";
 import { parseUserNumber } from "./numbers.ts";
 import type { Button } from "./telegram.ts";
 import { LINE_NAMES } from "./types.ts";
-import type { LineKey } from "./types.ts";
 import { buildView } from "./view.ts";
 
 export interface BotDeps {
@@ -71,7 +70,7 @@ export class Bot {
       const v = parseUserNumber(text);
       if (p && v != null) {
         this.store.setMeta(AWAITING, null);
-        return this.setAlvo(p, "amazon", v);
+        return this.setAlvo(p, v);
       }
     }
     return this.d.send("Não entendi. Cole um link da Amazon ou use <code>/ajuda</code>.");
@@ -113,13 +112,9 @@ export class Bot {
       case "/alvo": {
         const p = await needP();
         if (!p) return;
-        const rest = args.slice(1);
-        const linha = rest.length > 1 ? fmt.lineKeyFrom(rest[0]) : "amazon";
-        const v = parseUserNumber(rest[rest.length - 1] ?? "");
-        if (!linha || v == null) return this.d.send("Use: <code>/alvo N valor</code> ou <code>/alvo N terceiros valor</code>");
-        if (linha !== "amazon" && !(linha === "terceiros" ? p.terceirosOn : p.usadoOn))
-          return this.d.send(`A linha <b>${LINE_NAMES[linha]}</b> está desligada. Ligue com <code>/linhas ${n}</code>.`);
-        return this.setAlvo(p, linha, v);
+        const v = parseUserNumber(args[args.length - 1] ?? "");
+        if (args.length < 2 || v == null) return this.d.send("Use: <code>/alvo N valor</code>");
+        return this.setAlvo(p, v);
       }
       case "/pausar": {
         const p = await needP();
@@ -157,7 +152,7 @@ export class Bot {
     }
     const view = this.view(r.product);
     await this.d.send(fmt.card(view), undefined, photoOf(r.product));
-    return this.askTarget(r.product, view.linhas.amazon.atual);
+    return this.askTarget(r.product, view.menor);
   }
 
   /** Vários links de uma vez (ex.: do userscript na busca). Cadastra sem perguntar alvo e resume no fim. */
@@ -190,18 +185,16 @@ export class Bot {
     kb.push({ text: "Sem alvo por enquanto", callback_data: `nt:${p.id}` });
     const intro =
       preco != null
-        ? "Qual o preço-alvo para a linha <b>Amazon</b>? Responda com um valor (ex.: <code>449</code>) ou escolha abaixo."
-        : "A Amazon não vende este item agora. Defina um alvo para quando ela voltar (ex.: <code>449</code>), ou escolha abaixo.";
+        ? "Qual o preço-alvo? Vale para qualquer fonte (Amazon, Terceiros ou Usado). Responda com um valor (ex.: <code>449</code>) ou escolha abaixo."
+        : "Não há oferta deste item agora. Defina um alvo para quando aparecer (ex.: <code>449</code>), ou escolha abaixo.";
     return this.d.send(intro, [kb]);
   }
 
-  private async setAlvo(p: Product, linha: LineKey, v: number): Promise<void> {
-    const res = this.act.setAlvo(p, linha, v);
-    if (!res.ok) return this.d.send(`A linha <b>${LINE_NAMES[linha]}</b> está desligada. Ligue com <code>/linhas ${this.store.numberOf(p.id)}</code>.`);
+  private async setAlvo(p: Product, v: number): Promise<void> {
+    const res = this.act.setAlvo(p, v);
     const view = this.view(p);
-    const atual = res.atual;
-    let msg = `Alvo da linha <b>${LINE_NAMES[linha]}</b> do item #${view.num}: <b>${fmt.money(v)}</b>. Aviso quando ficar igual ou abaixo.`;
-    if (atual != null && atual <= v) msg += `\nO preço atual (${fmt.money(atual)}) já está dentro do alvo. Você será avisado na próxima coleta.`;
+    let msg = `Alvo do item #${view.num}: <b>${fmt.money(v)}</b>. Vale para qualquer fonte (Amazon, Terceiros ou Usado): aviso quando a menor oferta ficar igual ou abaixo.`;
+    if (res.atual != null && res.atual <= v) msg += `\nO menor preço atual (${fmt.money(res.atual)}) já está dentro do alvo. Você será avisado na próxima coleta.`;
     return this.d.send(msg);
   }
 
@@ -227,7 +220,7 @@ export class Bot {
         const v = Number(b);
         if (!Number.isFinite(v) || v <= 0) return;
         this.store.setMeta(AWAITING, null);
-        return this.setAlvo(p, "amazon", v);
+        return this.setAlvo(p, v);
       }
       case "nt":
         this.store.setMeta(AWAITING, null);

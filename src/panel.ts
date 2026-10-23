@@ -31,6 +31,9 @@ export interface PanelItem {
   criadoEm: string;
   grupoId: number | null;
   linhas: ReturnType<typeof buildView>["linhas"];
+  /** Alvo único e menor preço atual entre as fontes. */
+  alvo: number | null;
+  menor: number | null;
   /** Última leitura da Amazon (null = nunca lido): separa "aguardando", "sem oferta confirmado" e "erro". */
   ultimaColeta: UltimaColeta | null;
   /** Preço da Amazon (ou da linha mais barata ligada) nos últimos 7 dias, para o mini-gráfico. */
@@ -79,7 +82,7 @@ export function panelItems(store: Store, now: Date): PanelItem[] {
         "SELECT coletado_em AS t, preco AS v FROM price_lines WHERE product_id = ? AND linha = ? AND coletado_em >= ? ORDER BY coletado_em",
       )
       .all(p.id, v.linhas.amazon.atual != null || v.linhas.amazon.coletas > 0 ? "amazon" : "terceiros", desde) as PanelItem["mini"];
-    return { num: v.num, asin: p.asin, titulo: p.titulo, pausado: p.pausado, estrela: p.estrela, falhasSeguidas: p.falhasSeguidas, silenciadoAte: mutedUntil(store, p.id, now), url: productUrl(p.asin), imagem: p.imagem && IMAGE_HOST_RE.test(p.imagem) ? p.imagem : null, criadoEm: p.criadoEm, grupoId: p.grupoId, linhas: v.linhas, ultimaColeta: store.getUltimaColeta(p.id), mini: rows };
+    return { num: v.num, asin: p.asin, titulo: p.titulo, pausado: p.pausado, estrela: p.estrela, falhasSeguidas: p.falhasSeguidas, silenciadoAte: mutedUntil(store, p.id, now), url: productUrl(p.asin), imagem: p.imagem && IMAGE_HOST_RE.test(p.imagem) ? p.imagem : null, criadoEm: p.criadoEm, grupoId: p.grupoId, linhas: v.linhas, alvo: v.alvo, menor: v.menor, ultimaColeta: store.getUltimaColeta(p.id), mini: rows };
   });
 }
 
@@ -138,6 +141,8 @@ export function panelDetail(store: Store, p: Product, now: Date, days: number) {
     dias: days,
     desde,
     linhas: view.linhas,
+    alvo: view.alvo,
+    menor: view.menor,
     series,
     semAmazon,
     ofertasEm: lastAt,
@@ -160,8 +165,8 @@ export function panelGrupo(store: Store, g: Grupo, now: Date, days: number) {
     .map((p) => {
       const v = buildView(store, p, now);
       const linha = linhaPrincipal(v);
-      // Com a Amazon sem oferta, o preço é o do melhor terceiro (linha Terceiros) e o alvo continua sendo o da linha Amazon.
-      const l = v.linhas.terceiros.automatico ? { ...v.linhas.terceiros, alvo: v.linhas.amazon.alvo } : v.linhas[linha];
+      const l = v.linhas[linha];
+      const ml = v.menorLinha ? v.linhas[v.menorLinha] : null;
       const serie = store.db
         .query("SELECT coletado_em AS t, preco AS v FROM price_lines WHERE product_id = ? AND linha = ? AND coletado_em >= ? ORDER BY coletado_em")
         .all(p.id, linha, desde) as Array<{ t: string; v: number }>;
@@ -174,9 +179,9 @@ export function panelGrupo(store: Store, g: Grupo, now: Date, days: number) {
         pausado: p.pausado,
         estrela: p.estrela,
         linha,
-        atual: l.atual,
-        vendedor: l.vendedor,
-        alvo: l.alvo,
+        atual: v.menor,
+        vendedor: ml?.vendedor ?? null,
+        alvo: v.alvo,
         min: l.min,
         max: l.max,
         serie,
@@ -426,9 +431,7 @@ async function itemWrite(d: PanelDeps, act: Actions, method: string, p: Product,
   const body = await readBody(req);
   switch (sub) {
     case "alvo": {
-      const linha = lineOf(body["linha"], LINE_KEYS);
-      const r = act.setAlvo(p, linha, alvoOf(body["valor"]));
-      if (!r.ok) return json({ erro: "Essa linha está desligada. Ligue a linha antes de definir o alvo." }, 409);
+      const r = act.setAlvo(p, alvoOf(body["valor"]));
       return json({ ...panelDetail(d.store, d.store.getById(p.id)!, now, 14), dentroDoAlvo: r.dentro });
     }
     case "pausa":

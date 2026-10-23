@@ -49,7 +49,7 @@ describe("runCycle", () => {
   });
 
   test("coleta, grava e avisa o alvo uma vez", async () => {
-    store.setAlvo(1, "amazon", 25);
+    store.setAlvo(1, 25);
     expect(await runCycle(deps())).toMatchObject({ tentados: 1, ok: 1, falhas: 0, alertas: 1 });
     expect(sent[0]).toContain("ALVO ATINGIDO · AMAZON");
     tick(net);
@@ -67,7 +67,7 @@ describe("runCycle", () => {
   });
 
   test("silenciado: coleta mas não avisa", async () => {
-    store.setAlvo(1, "amazon", 25);
+    store.setAlvo(1, 25);
     store.setMeta("mute:1", new Date(net.clock.t + 3_600_000).toISOString());
     const r = await runCycle(deps());
     expect(r.ok).toBe(1);
@@ -75,7 +75,7 @@ describe("runCycle", () => {
   });
 
   test("alerta é reenviado se o Telegram falha, e conta só quando chega", async () => {
-    store.setAlvo(1, "amazon", 25);
+    store.setAlvo(1, 25);
     failSends = 2;
     const r = await runCycle(deps());
     expect(r.alertas).toBe(1);
@@ -85,7 +85,7 @@ describe("runCycle", () => {
   });
 
   test("Telegram fora de vez: não derruba a rodada", async () => {
-    store.setAlvo(1, "amazon", 25);
+    store.setAlvo(1, 25);
     failSends = 99;
     const r = await runCycle(deps());
     expect(r).toMatchObject({ ok: 1, alertas: 0 });

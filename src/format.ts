@@ -35,7 +35,7 @@ export function card(v: ProductView): string {
     else if (l.atual == null) lines.push(`${LINE_NAMES[k]}  sem oferta`);
     else lines.push(`${LINE_NAMES[k]}  ${money(l.atual)}${l.vendedor ? ` · ${esc(l.vendedor)}` : ""}`);
   }
-  lines.push("", `Alvo ${v.linhas.terceiros.automatico && a.atual == null ? "Amazon (vale para o terceiro enquanto ela não vende)" : "Amazon"}: ${a.alvo != null ? `<b>${money(a.alvo)}</b>` : "não definido"}`);
+  lines.push("", `Alvo (vale para qualquer fonte): ${v.alvo != null ? `<b>${money(v.alvo)}</b>` : "não definido"}`);
   if (v.pausado) lines.push("<i>Pausado</i>");
   return lines.join("\n");
 }
@@ -71,7 +71,7 @@ export function alert(item: AlertItem, view: ProductView): string {
   const e = item.evento;
   const name = esc(view.titulo ?? view.asin);
   if (e.tipo === "voltou") {
-    const alvo = view.linhas.amazon.alvo;
+    const alvo = view.alvo;
     return `<b>AMAZON VOLTOU A VENDER</b>\n<b>${name}</b>\n${money(e.preco)}\nAlvo ${alvo != null ? money(alvo) : "não definido"}`;
   }
   const linha = item.terceiro ? "MELHOR TERCEIRO (AMAZON SEM OFERTA)" : LINE_NAMES[e.linha].toUpperCase();
@@ -112,18 +112,9 @@ export const HELP = `<b>Comandos</b>
 <code>/item N</code>  card do item com foto, preço e botão Consultar agora
 <code>/historico N</code>  mínimo, máximo e variação
 <code>/linhas N</code>  liga ou desliga Terceiros e Usado
-<code>/alvo N valor</code>  alvo da linha Amazon
-<code>/alvo N terceiros valor</code>  alvo de outra linha
+<code>/alvo N valor</code>  alvo do item (vale para Amazon, Terceiros e Usado)
 <code>/pausar N</code>  pausa ou retoma
 <code>/estrela N</code>  liga ou desliga a estrela (prioridade na coleta)
 <code>/remover N</code>  apaga o item e o histórico
 
 Para rastrear, cole o link do produto (ou vários, um por linha, até 20).`;
-
-export const lineKeyFrom = (s: string | undefined): LineKey | null => {
-  const t = (s ?? "").toLowerCase();
-  if (/^terc/.test(t)) return "terceiros";
-  if (/^usad/.test(t)) return "usado";
-  if (/^amaz/.test(t)) return "amazon";
-  return null;
-};

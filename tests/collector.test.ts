@@ -81,7 +81,7 @@ describe("alertas na coleta", () => {
   test("alvo atingido uma vez só enquanto o preço não cai mais", async () => {
     const net = fakeNet();
     const p = add();
-    store.setAlvo(p.id, "amazon", 25);
+    store.setAlvo(p.id, 25);
     const a = await collectOne(store, p, net.deps);
     expect(a.ok && a.alertas.map((x) => x.evento.tipo)).toEqual(["alvo"]);
     tick(net);
@@ -200,7 +200,7 @@ describe("Amazon sem oferta: melhor terceiro", () => {
   test("alvo da Amazon dispara com o terceiro e o alerta avisa que é terceiro; 'voltou' só com a Amazon de verdade", async () => {
     const net = fakeNet(semAmazon());
     const p = add();
-    store.setAlvo(p.id, "amazon", 400);
+    store.setAlvo(p.id, 400);
     const a = await collectOne(store, p, net.deps);
     expect(a.ok && a.alertas.map((x) => x.evento.tipo)).toEqual(["alvo"]);
     const item = a.ok ? a.alertas[0]! : (null as never);

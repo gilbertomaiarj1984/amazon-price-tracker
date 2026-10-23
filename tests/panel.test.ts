@@ -232,21 +232,24 @@ describe("ações do painel (escrita)", () => {
   });
 
   test("alvo: define, aceita formato brasileiro, recusa lixo e limpa", async () => {
-    let r = await W(`/api/itens/${ASIN}/alvo`, "PUT", { linha: "amazon", valor: "1.299,90" });
+    let r = await W(`/api/itens/${ASIN}/alvo`, "PUT", { valor: "1.299,90" });
     expect(r.status).toBe(200);
-    expect(store.getAlvo(1, "amazon")).toBe(1299.9);
+    expect(store.getAlvo(1)).toBe(1299.9);
     expect(((await r.json()) as any).dentroDoAlvo).toBe(true);
-    for (const valor of [-1, 0, "abc", 1e9, true, {}]) expect((await W(`/api/itens/${ASIN}/alvo`, "PUT", { linha: "amazon", valor })).status).toBe(400);
-    expect((await W(`/api/itens/${ASIN}/alvo`, "PUT", { linha: "outra", valor: 5 })).status).toBe(400);
-    expect(store.getAlvo(1, "amazon")).toBe(1299.9);
-    r = await W(`/api/itens/${ASIN}/alvo`, "PUT", { linha: "amazon", valor: null });
+    for (const valor of [-1, 0, "abc", 1e9, true, {}]) expect((await W(`/api/itens/${ASIN}/alvo`, "PUT", { valor })).status).toBe(400);
+    expect(store.getAlvo(1)).toBe(1299.9);
+    r = await W(`/api/itens/${ASIN}/alvo`, "PUT", { valor: null });
     expect(r.status).toBe(200);
-    expect(store.getAlvo(1, "amazon")).toBeNull();
+    expect(store.getAlvo(1)).toBeNull();
   });
 
-  test("alvo em linha desligada dá 409", async () => {
+  test("alvo vale para qualquer fonte: define mesmo com Terceiros desligado", async () => {
     store.setLinhaOn(1, "terceiros", false);
-    expect((await W(`/api/itens/${ASIN}/alvo`, "PUT", { linha: "terceiros", valor: 5 })).status).toBe(409);
+    const r = await W(`/api/itens/${ASIN}/alvo`, "PUT", { valor: 5 });
+    expect(r.status).toBe(200);
+    const j = (await r.json()) as any;
+    expect(j.alvo).toBe(5);
+    expect(store.getAlvo(1)).toBe(5);
   });
 
   test("pausa e retoma; valor precisa ser booleano", async () => {

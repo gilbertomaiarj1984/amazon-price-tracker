@@ -133,7 +133,7 @@ describe("runVarredura", () => {
 describe("aceitar sugestão", () => {
   test("cadastra, agrupa com o original, herda o alvo e lê o item", async () => {
     const o = origem();
-    store.setAlvo(o.id, "amazon", 150);
+    store.setAlvo(o.id, 150);
     await runVarredura(deps(pagesBy({ B00C061HZY: fx("product-variantes.html"), B00C061AAA: fx("product-amazon.html") })));
     const net = fakeNet();
     const act = new Actions({ store, now: () => new Date(T0), collect: (p) => collectOne(store, p, net.deps), resolve: async () => ({ ok: false, motivo: "sem_link" }) });
@@ -143,7 +143,7 @@ describe("aceitar sugestão", () => {
     const novo = store.getByAsin("B00C061AAA")!;
     expect(novo.grupoId).not.toBeNull();
     expect(novo.grupoId).toBe(store.getById(o.id)!.grupoId);
-    expect(store.getAlvo(novo.id, "amazon")).toBe(150);
+    expect(store.getAlvo(novo.id)).toBe(150);
     expect(store.getSugestao(s.id)!.status).toBe("aceita");
     expect((await act.aceitarSugestao(s.id)).ok).toBe(false);
   });

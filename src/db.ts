@@ -207,6 +207,24 @@ export class Store {
     if (!cols.some((c) => c.name === "imagem")) this.db.exec("ALTER TABLE products ADD COLUMN imagem TEXT");
     if (!cols.some((c) => c.name === "estrela")) this.db.exec("ALTER TABLE products ADD COLUMN estrela INTEGER NOT NULL DEFAULT 0");
     if (!cols.some((c) => c.name === "grupo_id")) this.db.exec("ALTER TABLE products ADD COLUMN grupo_id INTEGER REFERENCES grupos(id) ON DELETE SET NULL");
+    this.migrateAlvoGlobal();
+  }
+
+  /**
+   * O alvo é um só por item (vale para qualquer fonte) e fica na linha 'amazon' da tabela `alvos`.
+   * Bancos antigos tinham um alvo por linha: fica o da Amazon, ou o menor dos outros. Idempotente.
+   */
+  private migrateAlvoGlobal(): void {
+    this.db.transaction(() => {
+      this.db.exec(`
+        INSERT INTO alvos (product_id, linha, preco_alvo)
+          SELECT product_id, 'amazon', MIN(preco_alvo) FROM alvos
+          WHERE product_id NOT IN (SELECT product_id FROM alvos WHERE linha = 'amazon')
+          GROUP BY product_id;
+        DELETE FROM alvos WHERE linha != 'amazon';
+        UPDATE alert_state SET ultimo_alertado = NULL WHERE linha != 'amazon';
+      `);
+    })();
   }
 
   close(): void {
@@ -300,19 +318,20 @@ export class Store {
     this.db.query("DELETE FROM products WHERE id = ?").run(id);
   }
 
-  setAlvo(id: number, linha: LineKey, preco: number | null): void {
-    if (preco == null) this.db.query("DELETE FROM alvos WHERE product_id = ? AND linha = ?").run(id, linha);
+  /** Alvo único do item, válido para qualquer fonte (null apaga). */
+  setAlvo(id: number, preco: number | null): void {
+    if (preco == null) this.db.query("DELETE FROM alvos WHERE product_id = ?").run(id);
     else
       this.db
         .query(
-          "INSERT INTO alvos (product_id, linha, preco_alvo) VALUES (?, ?, ?) ON CONFLICT(product_id, linha) DO UPDATE SET preco_alvo = excluded.preco_alvo",
+          "INSERT INTO alvos (product_id, linha, preco_alvo) VALUES (?, 'amazon', ?) ON CONFLICT(product_id, linha) DO UPDATE SET preco_alvo = excluded.preco_alvo",
         )
-        .run(id, linha, preco);
-    this.db.query("UPDATE alert_state SET ultimo_alertado = NULL WHERE product_id = ? AND linha = ?").run(id, linha);
+        .run(id, preco);
+    this.db.query("UPDATE alert_state SET ultimo_alertado = NULL WHERE product_id = ?").run(id);
   }
 
-  getAlvo(id: number, linha: LineKey): number | null {
-    const r = this.db.query("SELECT preco_alvo FROM alvos WHERE product_id = ? AND linha = ?").get(id, linha) as {
+  getAlvo(id: number): number | null {
+    const r = this.db.query("SELECT preco_alvo FROM alvos WHERE product_id = ?").get(id) as {
       preco_alvo: number;
     } | null;
     return r ? r.preco_alvo : null;

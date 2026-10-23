@@ -95,17 +95,17 @@ const MOTIVOS={captcha:'captcha da Amazon',http_503:'Amazon respondeu 503',http_
 const motivo=m=>MOTIVOS[m]||m||'motivo desconhecido';
 /* nunca = ainda sem leitura; erro = leitura falhou e nada foi gravado; ok = leu (a Amazon pode não ter oferta) */
 const lido=i=>i.linhas.amazon.coletas||(i.ultimaColeta&&i.ultimaColeta.ok)?'ok':i.ultimaColeta?'erro':'nunca';
-/* preço exibido: o da Amazon, ou o do melhor terceiro quando ela não vende */
-const ap=i=>{const a=i.linhas.amazon,t=i.linhas.terceiros;return a.atual!=null?a.atual:(t.automatico?t.atual:null)};
+/* preço exibido: o menor entre as fontes com oferta (Amazon, Terceiros, Usado); o alvo é um só e vale para qualquer fonte */
+const ap=i=>i.menor;
 function atualiz(i){const u=i.ultimaColeta;if(!u)return '<span class="mut">Ainda não atualizado</span>';return '<span class="mut" title="'+esc(dt(u.em))+'">Atualizado '+dt(u.em)+' ('+ago(u.em)+')'+(u.ok?'':' · última tentativa falhou')+'</span>'}
 function status(i){const a=i.linhas.amazon,v=ap(i);
  if(i.pausado)return{k:'paused',t:'Pausado'};
  if(!a.coletas&&!i.ultimaColeta)return{k:'',t:'Aguardando 1ª coleta'};
  if(!a.coletas&&!i.ultimaColeta.ok)return{k:'gap',t:'Erro na coleta ('+motivo(i.ultimaColeta.motivo)+')'};
  if(v==null)return{k:'gap',t:'Amazon sem oferta (confirmado)'};
- if(a.alvo==null)return{k:'',t:a.atual==null?'Amazon sem oferta · só terceiro':'Sem alvo'};
- if(v<=a.alvo)return{k:'below',t:'▼ Dentro do alvo'};
- const p=(v-a.alvo)/a.alvo*100;return{k:p>LIMITE_LARANJA?'hot':'warn',t:'▲ '+p.toFixed(1).replace('.',',')+'% acima do alvo'}}
+ if(i.alvo==null)return{k:'',t:a.atual==null?'Amazon sem oferta · só terceiro':'Sem alvo'};
+ if(v<=i.alvo)return{k:'below',t:'▼ Dentro do alvo'};
+ const p=(v-i.alvo)/i.alvo*100;return{k:p>LIMITE_LARANJA?'hot':'warn',t:'▲ '+p.toFixed(1).replace('.',',')+'% acima do alvo'}}
 const LIMITE_LARANJA=20;/* % acima do alvo, (atual − alvo) / alvo: até aqui laranja, acima disso vermelho */
 const pill=s=>'<span class="pill '+s.k+'">'+esc(s.t)+'</span>';
 function foto(i,cls){return '<div class="foto">'+(i.imagem?'<img src="'+esc(i.imagem)+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.textContent=\\'🛒\\'">':'<span>🛒</span>')+'</div>'}
@@ -128,18 +128,18 @@ let F=Object.assign({},F0);try{Object.assign(F,JSON.parse(localStorage.getItem(F
 const salvaF=()=>{try{localStorage.setItem(FK,JSON.stringify(F))}catch(e){}};
 const sem=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const nv=t=>{const n=Number(String(t).replace(/[^0-9,.]/g,'').replace(',','.'));return t===''||!isFinite(n)?null:n};
-function dist(i){const a=i.linhas.amazon,v=ap(i);return v!=null&&a.alvo!=null?(v-a.alvo)/a.alvo*100:null}
+function dist(i){const v=ap(i);return v!=null&&i.alvo!=null?(v-i.alvo)/i.alvo*100:null}
 function queda(i){const m=i.mini;return m.length>1&&m[0].v?(m[m.length-1].v-m[0].v)/m[0].v*100:null}
 function ultima(i){const m=i.mini;return m.length?Date.parse(m[m.length-1].t):null}
-function preco(i){const a=i.linhas.amazon;if(a.atual!=null)return a.atual;const o=['terceiros','usado'].map(k=>i.linhas[k].atual).filter(v=>v!=null);return o.length?Math.min(...o):null}
+function preco(i){return i.menor}
 const gmap=()=>Object.fromEntries(S.grupos.map(g=>[String(g.id),g.nome]));
 const gnome=id=>(S.grupos.find(g=>g.id===id)||{}).nome;
 const FILTROS={'':'Todos os status',dentro:'Dentro do alvo',acima:'Acima do alvo',semalvo:'Sem alvo',pausado:'Pausados',falha:'Com falha na coleta',semoferta:'Amazon sem oferta',semcoleta:'Sem coleta ainda',estrela:'Só com estrela ★'};
 function passa(i){const a=i.linhas.amazon,t=sem(i.titulo)+' '+i.asin.toLowerCase()+' '+sem(i.grupoId!=null?gnome(i.grupoId):'');
  if(F.q&&!F.q.split(/\\s+/).every(w=>t.includes(sem(w))))return false;
- switch(F.st){case 'dentro':if(!(ap(i)!=null&&a.alvo!=null&&ap(i)<=a.alvo))return false;break;
-  case 'acima':if(!(ap(i)!=null&&a.alvo!=null&&ap(i)>a.alvo))return false;break;
-  case 'semalvo':if(a.alvo!=null)return false;break;case 'pausado':if(!i.pausado)return false;break;
+ switch(F.st){case 'dentro':if(!(ap(i)!=null&&i.alvo!=null&&ap(i)<=i.alvo))return false;break;
+  case 'acima':if(!(ap(i)!=null&&i.alvo!=null&&ap(i)>i.alvo))return false;break;
+  case 'semalvo':if(i.alvo!=null)return false;break;case 'pausado':if(!i.pausado)return false;break;
   case 'estrela':if(!i.estrela)return false;break;case 'falha':if(!(i.falhasSeguidas>0))return false;break;case 'semoferta':if(!(lido(i)==='ok'&&a.atual==null))return false;break;
   case 'semcoleta':if(lido(i)==='ok')return false;break}
  if(F.gr==='none'?i.grupoId!=null:F.gr&&String(i.grupoId)!==F.gr)return false;
@@ -204,8 +204,8 @@ function renderEsq(){let h='',add='',grp='';salvaT();
  const card=i=>{const a=i.linhas.amazon,st=status(i);
   const tags=(i.linhas.terceiros.automatico?'<span class="pill" title="A Amazon não vende; este é o melhor terceiro">Terceiro: '+esc(i.linhas.terceiros.vendedor||'?')+'</span>':'')+(i.silenciadoAte?'<span class="pill">alertas silenciados</span>':'')+(i.falhasSeguidas>0?'<span class="pill fail">falha na coleta</span>':'')+'';
   const cor=a.coletas?COR.amazon:COR.terceiros;
-  const al=a.alvo,chips=ap(i)!=null?[5,10,15].map(p=>{const v=Math.round(ap(i)*(1-p/100));return '<button type="button" class="btn sm" data-cv="'+v+'" title="'+brl(v)+'">−'+p+'%</button>'}).join(''):'';
-  const alv=S.edit?'<div class="alv" data-asin="'+esc(i.asin)+'"><span class="mut">Alvo</span><input type="text" class="val" inputmode="decimal" placeholder="ex.: 449" value="'+(al!=null?String(al).replace('.',','):'')+'" aria-label="Alvo da Amazon do item '+i.num+'"><button type="button" class="btn sm pri" data-cs="1">Definir</button>'+chips+(al!=null?'<button type="button" class="btn sm" data-cx="1" title="Remover alvo">×</button>':'')+'</div>':'';
+  const al=i.alvo,chips=ap(i)!=null?[5,10,15].map(p=>{const v=Math.round(ap(i)*(1-p/100));return '<button type="button" class="btn sm" data-cv="'+v+'" title="'+brl(v)+'">−'+p+'%</button>'}).join(''):'';
+  const alv=S.edit?'<div class="alv" data-asin="'+esc(i.asin)+'"><span class="mut">Alvo</span><input type="text" class="val" inputmode="decimal" placeholder="ex.: 449" value="'+(al!=null?String(al).replace('.',','):'')+'" aria-label="Alvo do item '+i.num+'"><button type="button" class="btn sm pri" data-cs="1">Definir</button>'+chips+(al!=null?'<button type="button" class="btn sm" data-cx="1" title="Remover alvo">×</button>':'')+'</div>':'';
   return '<div class="itw'+(!(i.falhasSeguidas>0)&&{below:' in',warn:' warn',hot:' hot'}[st.k]||'')+(i.asin===S.sel?' sel':'')+'"'+(S.edit?' draggable="true" data-dr="'+esc(i.asin)+'"':'')+'><button type="button" class="item" data-asin="'+esc(i.asin)+'" aria-pressed="'+(i.asin===S.sel)+'">'+foto(i)
    +'<span class="ti"><b>'+(i.estrela?'<span class="star" title="Prioridade">★</span> ':'')+esc(i.titulo||i.asin)+'</b></span><span class="pr num">'+(ap(i)!=null?brl(ap(i)):'—')+'</span>'
    +'<span class="stt">'+pill(st)+tags+(i.ultimaColeta?'<span class="mut" title="Última atualização">↻ '+ago(i.ultimaColeta.em)+'</span>':'')+'</span>'+degraus(i.mini,80,26,cor)+'</button>'+alv+'</div>'};
@@ -234,7 +234,7 @@ function renderEsq(){let h='',add='',grp='';salvaT();
  document.querySelectorAll('#pn-grp [data-g]').forEach(b=>b.onclick=()=>{if(b.dataset.g!=='none'){setPn(null);abrirGrupo(Number(b.dataset.g))}});
  $('#lst').querySelectorAll('[data-gid]').forEach(b=>b.onclick=()=>{const g=Number(b.dataset.gid);if(b.getAttribute('aria-expanded')==='true'&&S.abertos.has(g)){S.abertos.delete(g);if(S.gsel===g){S.gsel=null;detalhe()}renderEsq()}else abrirGrupo(g)});
  $('#lst').querySelectorAll('.alv').forEach(c=>{const asin=c.dataset.asin,inp=c.querySelector('input'),
-  set=(b,val,msg)=>rodar(b,async()=>{await api('PUT','/api/itens/'+asin+'/alvo',{linha:'amazon',valor:val});aviso(msg);await carregar()});
+  set=(b,val,msg)=>rodar(b,async()=>{await api('PUT','/api/itens/'+asin+'/alvo',{valor:val});aviso(msg);await carregar()});
   c.querySelector('[data-cs]').onclick=e=>{const t=inp.value.trim();if(!t)return aviso('Digite um valor.',1);set(e.target,t,'Alvo salvo.')};
   inp.onkeydown=e=>{if(e.key==='Enter')c.querySelector('[data-cs]').click()};
   c.querySelectorAll('[data-cv]').forEach(b=>b.onclick=()=>set(b,Number(b.dataset.cv),'Alvo salvo.'));
@@ -256,10 +256,10 @@ async function adicionar(){const ls=tokens($('#txt').value);if(!ls.length)throw 
  if(novos.length===1)h+=picker(novos[0].item.asin,novos[0].item.amazonAtual);
  else if(novos.length)h+='<div class="mut">Selecione cada item para definir o preço-alvo.</div>';
  S.ult=h;$('#txt').value='';if(novos.length)S.sel=novos[novos.length-1].item.asin;await carregar()}
-function picker(asin,atual){let h='<div class="cd cp" data-picker="'+esc(asin)+'" style="margin-top:8px"><b>Qual o preço-alvo da linha Amazon?</b>'+(atual==null?'<div class="mut">A Amazon não vende este item agora; defina um alvo para quando ela voltar.</div>':'')+'<div class="row">';
+function picker(asin,atual){let h='<div class="cd cp" data-picker="'+esc(asin)+'" style="margin-top:8px"><b>Qual o preço-alvo?</b><div class="mut">Vale para qualquer fonte: Amazon, Terceiros ou Usado.</div>'+(atual==null?'<div class="mut">Não há oferta deste item agora; defina um alvo para quando aparecer.</div>':'')+'<div class="row">';
  if(atual!=null)for(const p of [5,10,15]){const v=Math.round(atual*(1-p/100));h+='<button class="btn" data-v="'+v+'">−'+p+'% · '+brl(v)+'</button>'}
  return h+'<input type="text" class="val" inputmode="decimal" placeholder="ex.: 449"><button class="btn pri" data-custom="1">Definir</button><button class="btn" data-skip="1">Sem alvo por enquanto</button></div></div>'}
-function bindPickers(root){root.querySelectorAll('[data-picker]').forEach(c=>{const asin=c.dataset.picker,set=(btn,val)=>rodar(btn,async()=>{await api('PUT','/api/itens/'+asin+'/alvo',{linha:'amazon',valor:val});S.ult='';aviso('Alvo definido: '+brl(typeof val==='number'?val:Number(String(val).replace(/[^0-9,.]/g,'').replace(',','.'))));await carregar()});
+function bindPickers(root){root.querySelectorAll('[data-picker]').forEach(c=>{const asin=c.dataset.picker,set=(btn,val)=>rodar(btn,async()=>{await api('PUT','/api/itens/'+asin+'/alvo',{valor:val});S.ult='';aviso('Alvo definido: '+brl(typeof val==='number'?val:Number(String(val).replace(/[^0-9,.]/g,'').replace(',','.'))));await carregar()});
  c.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>set(b,Number(b.dataset.v)));
  c.querySelector('[data-custom]').onclick=e=>{const t=c.querySelector('input').value.trim();if(!t)return aviso('Digite um valor.',1);set(e.target,t)};
  c.querySelector('[data-skip]').onclick=()=>{S.ult='';renderEsq()}})}
@@ -272,7 +272,7 @@ function grafico(d){const host=$('#chart');if(!host)return;const W=host.clientWi
  const ls=LK.filter(k=>ativa(d.linhas[k]));
  let vals=ls.flatMap(k=>d.series[k].map(p=>p.v));
  if(!vals.length){host.innerHTML='<p class="mut">Sem coletas neste período.</p>';return}
- for(const k of ls)if(d.linhas[k].alvo!=null)vals.push(d.linhas[k].alvo);
+ if(d.alvo!=null)vals.push(d.alvo);
  let y0=Math.min(...vals),y1=Math.max(...vals);const sp=Math.max(y1-y0,y1*.05);y0-=sp*.12;y1+=sp*.12;
  const pw=W-L-R,ph=H-T-B,X=t=>L+(Date.parse(t)-x0)/(x1-x0)*pw,Y=v=>T+(1-(v-y0)/(y1-y0))*ph;
  let s='';
@@ -281,7 +281,7 @@ function grafico(d){const host=$('#chart');if(!host)return;const W=host.clientWi
  s+='<line x1="'+L+'" x2="'+(L+pw)+'" y1="'+(T+ph)+'" y2="'+(T+ph)+'" stroke="var(--axis)"/>';
  const passo=S.dias<=7?1:S.dias<=14?2:5;
  for(let n=0;n*passo<=S.dias;n++){const t=x1-n*passo*86400000;if(t<x0)break;const x=L+(t-x0)/(x1-x0)*pw;s+='<text x="'+x.toFixed(1)+'" y="'+(H-8)+'" text-anchor="'+(n===0?'end':'middle')+'" font-size="11.5" fill="var(--mut)">'+(n===0?'agora':dm(t))+'</text>'}
- for(const k of ls){const a=d.linhas[k].alvo;if(a==null)continue;s+='<line x1="'+L+'" x2="'+(L+pw)+'" y1="'+Y(a).toFixed(1)+'" y2="'+Y(a).toFixed(1)+'" stroke="'+COR[k]+'" stroke-width="1.5" stroke-dasharray="5 4"/><text x="'+(L+pw-4)+'" y="'+(Y(a)-5).toFixed(1)+'" text-anchor="end" font-size="11.5" fill="var(--fg2)">Alvo '+(k==='amazon'?'':NOME[k]+' ')+brl(a)+'</text>'}
+ {const a=d.alvo;if(a!=null)s+='<line x1="'+L+'" x2="'+(L+pw)+'" y1="'+Y(a).toFixed(1)+'" y2="'+Y(a).toFixed(1)+'" stroke="var(--fg2)" stroke-width="1.5" stroke-dasharray="5 4"/><text x="'+(L+pw-4)+'" y="'+(Y(a)-5).toFixed(1)+'" text-anchor="end" font-size="11.5" fill="var(--fg2)">Alvo '+(k==='amazon'?'':NOME[k]+' ')+brl(a)+'</text>'}
  for(const k of ls.slice().reverse()){const pts=d.series[k];if(!pts.length)continue;
   const path=pts.map((p,i)=>i?'H'+X(p.t).toFixed(1)+'V'+Y(p.v).toFixed(1):'M'+X(p.t).toFixed(1)+','+Y(p.v).toFixed(1)).join(''),l=pts[pts.length-1];
   s+='<path d="'+path+'" fill="none" stroke="'+COR[k]+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'+(pts.length===1?'<circle cx="'+X(l.t).toFixed(1)+'" cy="'+Y(l.v).toFixed(1)+'" r="3" fill="'+COR[k]+'"/>':'')+'<circle cx="'+X(l.t).toFixed(1)+'" cy="'+Y(l.v).toFixed(1)+'" r="4.5" fill="'+COR[k]+'" stroke="var(--sf)" stroke-width="2"/>'}
@@ -314,14 +314,14 @@ function renderDir(){if(S.gsel!=null)return renderGrupo();const d=S.det,it=S.ite
  let h='<div class="dh"><div style="display:flex;gap:14px;min-width:0">'+foto(it)+'<div><h2>'+esc(d.titulo||d.asin)+'</h2><div class="meta"><span class="mono">#'+d.num+' · '+esc(d.asin)+'</span>'+pill(st)+atualiz(it)+(d.silenciadoAte?'<span class="pill">alertas silenciados até '+esc(new Date(d.silenciadoAte).toLocaleString('pt-BR'))+'</span>':'')+'</div></div></div>';
  h+='<div class="act">'+(url?'<a class="btn sm" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Abrir na Amazon</a>':'')+(S.edit?'<button class="btn sm" data-q="1"'+(libera(d)?' disabled':'')+'>'+(libera(d)?'Consultar em '+libera(d)+' min':'Consultar agora')+'</button><button class="btn sm" data-st="1">'+(d.estrela?'★ Tirar estrela':'☆ Dar estrela')+'</button><button class="btn sm" data-p="1">'+(d.pausado?'Retomar':'Pausar')+'</button><button class="btn sm" data-s="1">'+(d.silenciadoAte?'Reativar alertas':'Silenciar 24 h')+'</button><button class="btn sm bad" data-r="1">Remover</button>':'')+'</div></div>';
  h+='<div class="row" style="margin-top:12px"><span class="mut">Grupo</span>'+(S.edit?'<select id="dg" aria-label="Grupo do item"><option value="">Sem grupo</option>'+S.grupos.map(g=>'<option value="'+g.id+'"'+(g.id===it.grupoId?' selected':'')+'>'+esc(g.nome)+'</option>').join('')+'<option value="new">+ Novo grupo…</option></select>':'<b>'+esc(gnome(it.grupoId)||'—')+'</b>')+(it.grupoId!=null?'<button type="button" class="btn sm" data-vg="1">Ver grupo</button>':'')+'</div>';
- h+='<div class="tw"><table><tr><th>Linha de preço</th><th class="n">Agora</th><th class="n">Alvo</th><th class="n">Mín 30 d</th><th class="n">Máx 30 d</th><th class="n">Variação</th>'+(S.edit?'<th>Coleta</th>':'')+'</tr>';
+ h+='<div class="row" style="margin-top:12px"><span class="mut">Alvo (qualquer fonte)</span>'+(S.edit?'<input type="text" class="val" inputmode="decimal" id="alvo" value="'+(d.alvo!=null?String(d.alvo).replace('.',','):'')+'" placeholder="sem alvo" aria-label="Alvo do item">':'<b>'+(d.alvo!=null?brl(d.alvo):'—')+'</b>')+(d.menor!=null?'<span class="mut">menor preço agora '+brl(d.menor)+'</span>':'')+'</div>';
+ h+='<div class="tw"><table><tr><th>Linha de preço</th><th class="n">Agora</th><th class="n">Mín 30 d</th><th class="n">Máx 30 d</th><th class="n">Variação</th>'+(S.edit?'<th>Coleta</th>':'')+'</tr>';
  LK.forEach((k,idx)=>{const l=L[k],on=ativa(l);
   h+='<tr data-k="'+k+'"><td><i class="key" style="--c:'+COR[k]+'"></i><b style="font-weight:600">'+NOME[k]+'</b>'+(idx===0?' <span class="pill">principal</span>':'')+'</td>'
    +'<td class="n num">'+(on?(l.atual!=null?brl(l.atual)+(l.automatico?'<div class="mut">'+(l.ligada?'':'Automático (Amazon sem oferta) · ')+esc(l.vendedor||'?')+(l.automatico.envio==='amazon'?' · enviado pela Amazon':l.automatico.envio==='terceiro'?' · enviado pelo vendedor':'')+'</div>':''):idx===0&&lido(it)==='nunca'?'<span class="mut">aguardando</span>':idx===0&&lido(it)==='erro'?'<span class="mut">erro na coleta</span>':'<span class="mut">sem oferta</span>'):'<span class="mut">—</span>')+'</td>'
-   +'<td class="n">'+(S.edit?'<input type="text" class="val" inputmode="decimal" data-alvo="'+k+'" value="'+(l.alvo!=null?String(l.alvo).replace('.',','):'')+'" placeholder="sem alvo" aria-label="Alvo da linha '+NOME[k]+'"'+(l.ligada?'':' disabled')+'>':(l.alvo!=null?brl(l.alvo):'—'))+'</td>'
    +'<td class="n num">'+(on?brl(l.min):'—')+'</td><td class="n num">'+(on?brl(l.max):'—')+'</td><td class="n num">'+(on&&l.variacao!=null?pct(l.variacao):'—')+'</td>'
    +(S.edit?'<td>'+(idx===0?'<span class="mut">sempre</span>':'<label><input type="checkbox" data-linha="'+k+'" '+(l.ligada?'checked':'')+'> coletar</label>')+'</td>':'')+'</tr>'});
- h+='</table></div>'+(S.edit?'<div class="mut" style="margin-top:6px">Aviso no Telegram quando o preço ficar igual ou abaixo do alvo. Deixe o campo vazio para remover o alvo. Ligar Terceiros ou Usado usa 2 requisições por rodada.</div>':'');
+ h+='</table></div>'+(S.edit?'<div class="mut" style="margin-top:6px">Aviso no Telegram quando a menor oferta (Amazon, Terceiros ou Usado) ficar igual ou abaixo do alvo. Deixe o campo vazio para remover o alvo. Ligar Terceiros ou Usado usa 2 requisições por rodada.</div>':'');
  h+='<div class="bar"><div class="seg">'+[7,14,30].map(n=>'<button type="button" data-n="'+n+'" aria-pressed="'+(n===S.dias)+'">'+n+' dias</button>').join('')+'</div><div class="seg"><button type="button" data-vz="grafico" aria-pressed="'+(S.visao==='grafico')+'">Gráfico</button><button type="button" data-vz="tabela" aria-pressed="'+(S.visao==='tabela')+'">Tabela</button></div></div>';
  if(S.visao==='grafico')h+='<div class="chart" id="chart" tabindex="0"></div><div class="leg">'+LK.filter(k=>ativa(L[k])).map(k=>'<span><i class="key" style="--c:'+COR[k]+'"></i>'+NOME[k]+'</span>').join('')+'<span><i class="g"></i>Amazon não vendeu</span><span><i class="key" style="--c:var(--fg2);border-top-style:dashed"></i>Alvo</span></div>';
  else h+=tabelaColetas(d);
@@ -338,8 +338,8 @@ function renderDir(){if(S.gsel!=null)return renderGrupo();const d=S.det,it=S.ite
  const dg=dir.querySelector('#dg');if(dg)dg.onchange=()=>rodar(dg,async()=>{let v=dg.value;
   if(v==='new'){const n=(prompt('Nome do novo grupo (sugestão pelo título, pode editar):',sugerirNome([it]))||'').trim();if(!n){dg.value=it.grupoId==null?'':String(it.grupoId);return}v=String((await api('POST','/api/grupos',{nome:n})).id)}
   await api('PUT',A+'/grupo',{grupoId:v===''?null:Number(v)});aviso(v===''?'Item fora de grupos.':'Item colocado no grupo.');await carregar()});
- dir.querySelectorAll('[data-alvo]').forEach(i=>{const k=i.dataset.alvo,salvar=()=>{const t=i.value.trim();if((t===''?null:t)===(L[k].alvo!=null?String(L[k].alvo).replace('.',','):null))return;rodar(i,async()=>{await api('PUT',A+'/alvo',{linha:k,valor:t===''?null:t});aviso(t===''?'Alvo removido.':'Alvo salvo.');await carregar()})};
-  i.onchange=salvar;i.onkeydown=e=>{if(e.key==='Enter')i.blur()}});
+ {const i=dir.querySelector('#alvo'),salvar=()=>{const t=i.value.trim();if((t===''?null:t)===(d.alvo!=null?String(d.alvo).replace('.',','):null))return;rodar(i,async()=>{await api('PUT',A+'/alvo',{valor:t===''?null:t});aviso(t===''?'Alvo removido.':'Alvo salvo.');await carregar()})};
+  i.onchange=salvar;i.onkeydown=e=>{if(e.key==='Enter')i.blur()}}
  dir.querySelectorAll('[data-linha]').forEach(b=>b.onchange=()=>rodar(b,async()=>{const k=b.dataset.linha,on=b.checked;if(on)aviso('Lendo o produto…');const j=await api('PUT',A+'/linhas',{linha:k,ligada:on});aviso(on?(j.leitura==='ok'?'Linha ligada.':'Linha ligada, mas não consegui ler agora; entra na próxima rodada.'):'Linha desligada. O histórico fica guardado.',on&&j.leitura!=='ok');await carregar()}));
  dir.querySelector('[data-q]').onclick=e=>rodar(e.target,async()=>{aviso('Consultando a Amazon… pode levar alguns segundos.');const j=await api('POST',A+'/consultar');aviso(j.consulta==='ok'?'Consulta feita: preços atualizados.':'Não consegui ler agora'+(j.detalhe?' ('+j.detalhe+')':'')+'. A próxima rodada tenta de novo.',j.consulta!=='ok');S.ult='';await carregar()});
  dir.querySelector('[data-st]').onclick=e=>rodar(e.target,async()=>{await api('PUT',A+'/estrela',{estrela:!d.estrela});aviso(d.estrela?'Estrela removida.':'Item com estrela: é coletado primeiro em cada rodada.');await carregar()});
