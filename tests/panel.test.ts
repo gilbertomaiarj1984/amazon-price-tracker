@@ -460,6 +460,7 @@ test("lista com rolagem própria e detalhe fixo no desktop, empilhado no celular
   expect(html).toMatch(/@media\(min-width:901px\)\{[^@]*main\{height:100vh/);
   expect(html).toMatch(/\.det\{[^}]*overflow-y:auto/);
   expect(html).toMatch(/#lst\{flex:1;min-height:0;overflow-y:auto/);
+  expect(html.indexOf('id="filtros"')).toBeLessThan(html.indexOf('id="esq"'));
   const mobile = html.split("@media(max-width:900px)")[1]!;
   expect(mobile).not.toContain("sticky");
 });
