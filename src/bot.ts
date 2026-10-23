@@ -87,7 +87,8 @@ export class Bot {
       case "/ajuda":
         return this.d.send(fmt.HELP);
       case "/lista":
-        return this.d.send(fmt.list(this.store.list().map((p) => this.view(p))));
+        for (const page of fmt.list(this.store.list().map((p) => this.view(p)))) await this.d.send(page);
+        return;
       case "/historico": {
         const p = await needP();
         return p ? this.d.send(fmt.history(this.view(p))) : undefined;
