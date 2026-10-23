@@ -3,77 +3,171 @@ export const PANEL_HTML = `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Rastreador de preços</title>
 <style>
-:root{--bg:#fff;--fg:#1d2329;--mut:#667085;--card:#f6f7f9;--bd:#e3e6ea;--amz:#1d6fd6;--ter:#d97a06;--usa:#2f9e6b;--gap:rgba(120,120,120,.18);--bad:#c0392b}
-@media(prefers-color-scheme:dark){:root{--bg:#14171a;--fg:#e8eaed;--mut:#9aa3ad;--card:#1e2327;--bd:#2d343a;--amz:#5aa2ff;--ter:#f0a040;--usa:#4cc790;--gap:rgba(200,200,200,.14);--bad:#ff7b6b}}
-body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,sans-serif}
-main{max-width:900px;margin:0 auto;padding:16px}
-h1{font-size:20px;margin:0 0 12px}
-.saude{padding:10px 12px;border-radius:8px;background:var(--card);border:1px solid var(--bd);margin-bottom:16px;font-size:14px}
-.saude b.ok{color:var(--usa)}.saude b.atrasado,.saude b.sem_rodada{color:var(--ter)}.saude b.falhando{color:var(--bad)}
-.grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
-.item{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--card);cursor:pointer}
-.item:hover{border-color:var(--amz)}
-.item .foto{height:150px;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:8px;overflow:hidden}
-.item .foto img{max-width:100%;max-height:100%;object-fit:contain}.item .foto span{font-size:34px;color:#c3c8ce}
-.item .nome{font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.8em}
-.item .big{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
-.tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;border:1px solid var(--bd);margin-right:4px}.tag.ok{color:var(--usa);border-color:var(--usa)}.tag.bad{color:var(--bad);border-color:var(--bad)}
-.item .mini{display:flex;justify-content:space-between;align-items:flex-end;gap:8px}
-.mut{color:var(--mut);font-size:13px}.preco{font-weight:600;font-variant-numeric:tabular-nums}
-svg{display:block}.back{background:none;border:0;color:var(--amz);cursor:pointer;font-size:15px;padding:0 0 8px}
-.dias button{margin-right:6px;padding:4px 12px;border:1px solid var(--bd);background:var(--card);color:var(--fg);border-radius:14px;cursor:pointer}
-.dias button.on{background:var(--amz);color:#fff;border-color:var(--amz)}
-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:14px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--bd)}td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
-.leg span{margin-right:14px;font-size:13px}.leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px}
-tr.desc{color:var(--mut);text-decoration:line-through}
-.card{padding:12px;margin-bottom:12px;border:1px solid var(--bd);border-radius:8px;background:var(--card)}
-.card h3{font-size:15px;margin:0 0 8px}
-textarea,input[type=text]{box-sizing:border-box;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--fg);font:inherit;padding:8px}
-textarea{width:100%;resize:vertical}input.val{width:110px}
-.btn{padding:6px 12px;border:1px solid var(--bd);background:var(--bg);color:var(--fg);border-radius:6px;cursor:pointer;font:inherit;margin:4px 6px 0 0}
-.btn:hover{border-color:var(--amz)}.btn.pri{background:var(--amz);color:#fff;border-color:var(--amz)}.btn.bad{color:var(--bad);border-color:var(--bad)}.btn:disabled{opacity:.5;cursor:wait}
-.row{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin:6px 0}.row .l{min-width:90px}
-#aviso{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);max-width:90%;padding:10px 14px;border-radius:8px;background:var(--fg);color:var(--bg);font-size:14px;display:none}
+:root{--bg:#f1f3f5;--sf:#fcfcfb;--sf2:#f3f5f6;--fg:#10161b;--fg2:#47525b;--mut:#66707a;--bd:#dfe3e6;--grid:#e6e9ec;--axis:#c3c9ce;--acc:#1c5cab;--accsoft:#e4eefb;--amz:#2a78d6;--ter:#eb6834;--usa:#1baf7a;--good:#006300;--okb:#0a8a0a;--lar:#c25a00;--larbg:rgba(230,120,0,.18);--verm:#c62828;--goodbg:rgba(12,163,12,.16);--warn:#7a5200;--warnbg:rgba(250,178,25,.22);--bad:#b02a2a;--badbg:rgba(208,59,59,.16);--gap:rgba(16,22,27,.07);--sh:0 1px 2px rgba(16,22,27,.06),0 10px 28px rgba(16,22,27,.07)}
+@media(prefers-color-scheme:dark){:root{--bg:#0d0d0d;--sf:#1a1a19;--sf2:#232322;--fg:#f0efec;--fg2:#c3c2b7;--mut:#9b9a93;--bd:#2f2f2d;--grid:#2c2c2a;--axis:#383835;--acc:#6da7ec;--accsoft:#1c2a3d;--amz:#3987e5;--ter:#d95926;--usa:#199e70;--good:#3fc13f;--okb:#3fc13f;--lar:#ff9f45;--larbg:rgba(255,159,69,.2);--verm:#ff6b6b;--warn:#fab219;--bad:#ec6a6a;--gap:rgba(240,239,236,.08);--sh:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.4)}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+button,input{font:inherit;color:inherit}button{cursor:pointer}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+main{max-width:1240px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:22px;margin:0 0 14px;letter-spacing:-.01em}
+.num,.preco{font-variant-numeric:tabular-nums}.mut{color:var(--mut);font-size:13px}.mono{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.cd{background:var(--sf);border:1px solid var(--bd);border-radius:12px}
+.saude{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:center;padding:10px 14px;margin-bottom:16px;font-size:13.5px}
+.saude b{font-weight:600}.saude .st-ok{color:var(--good)}.saude .st-atrasado,.saude .st-sem_rodada{color:var(--warn)}.saude .st-falhando{color:var(--bad)}
+.split{display:grid;grid-template-columns:minmax(0,350px) minmax(0,1fr);gap:20px;align-items:start}
+.esq{display:grid;gap:12px;min-width:0}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;border-radius:999px;padding:2px 9px;background:var(--sf2);color:var(--fg2);white-space:nowrap}
+.pill.below{background:var(--goodbg);color:var(--good)}.pill.warn{background:var(--larbg);color:var(--lar)}.pill.hot{background:var(--badbg);color:var(--bad)}.pill.gap{background:var(--warnbg);color:var(--warn)}.pill.paused{color:var(--mut)}.pill.fail{background:var(--badbg);color:var(--bad)}
+.lista{display:grid;gap:8px}
+.itw{border:1px solid var(--bd);background:var(--sf);border-radius:12px;overflow:hidden}.itw:hover{background:var(--sf2)}.itw.in{border:2px solid var(--okb)}.itw.warn{border:2px solid var(--lar)}.itw.hot{border:2px solid var(--verm)}.itw.in .alv{border-top-color:var(--okb)}.itw.warn .alv{border-top-color:var(--lar)}.itw.hot .alv{border-top-color:var(--verm)}.itw.sel{box-shadow:0 0 0 3px var(--accsoft),0 0 0 4px var(--acc)}
+.item{display:grid;grid-template-columns:52px minmax(0,1fr) auto;grid-template-areas:"f t p" "f s sp";gap:4px 10px;align-items:center;width:100%;text-align:left;padding:10px;border:0;background:none}
+.alv{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;padding:0 10px 10px;border-top:1px dashed var(--bd);padding-top:8px;font-size:13px}.alv .val{width:84px}.alv .mut{margin-right:2px}
+.item .foto{grid-area:f;width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:8px;overflow:hidden}
+.item .foto img{max-width:100%;max-height:100%;object-fit:contain}.item .foto span{font-size:22px;color:#c3c8ce}
+.item .ti{grid-area:t;min-width:0}.item .ti b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-weight:600;font-size:14px;line-height:1.3}
+.item .pr{grid-area:p;font-weight:700;font-size:16px;text-align:right}.item .stt{grid-area:s;display:flex;flex-wrap:wrap;gap:4px}.item .sp{grid-area:sp}
+.det{padding:18px;min-width:0}
+.dh{display:flex;gap:14px;justify-content:space-between;flex-wrap:wrap;align-items:flex-start}
+.dh .foto{width:84px;height:84px;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:10px;overflow:hidden;flex:none}
+.dh .foto img{max-width:100%;max-height:100%;object-fit:contain}.dh .foto span{font-size:32px;color:#c3c8ce}
+.dh h2{margin:0;font-size:19px;line-height:1.3;max-width:62ch;text-wrap:balance}.dh .meta{color:var(--mut);font-size:12.5px;margin-top:4px;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
+.act{display:flex;gap:6px;flex-wrap:wrap}
+.btn{display:inline-block;padding:6px 12px;border:1px solid var(--bd);background:var(--sf);color:var(--fg);border-radius:8px;font-size:14px;font-weight:600;text-decoration:none}
+.btn:hover{background:var(--sf2)}.btn.pri{background:var(--acc);color:var(--sf);border-color:var(--acc)}.btn.pri:hover{filter:brightness(1.08)}.btn.bad{color:var(--bad)}.btn.sm{padding:3px 9px;font-size:13px}.btn:disabled{opacity:.5;cursor:wait}
+.tw{overflow-x:auto;margin-top:14px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}th{font-size:12px;font-weight:600;color:var(--mut);text-align:left;padding:6px 10px 6px 0;white-space:nowrap;border-bottom:1px solid var(--bd)}
+td{padding:8px 10px 8px 0;border-bottom:1px solid var(--grid);vertical-align:middle;white-space:nowrap}td.n,th.n{text-align:right}
+tr.desc td{color:var(--mut);text-decoration:line-through}tr.best td{font-weight:600}
+.key{display:inline-block;width:18px;height:0;border-top:3px solid var(--c);border-radius:2px;vertical-align:middle;margin-right:6px}
+input[type=text],textarea{border:1px solid var(--bd);border-radius:6px;background:var(--sf);color:var(--fg);padding:5px 8px}
+textarea{width:100%;resize:vertical;padding:8px}input.val{width:96px;text-align:right}
+.bar{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center;margin:18px 0 8px}
+.seg{display:inline-flex;border:1px solid var(--bd);border-radius:8px;overflow:hidden}.seg button{background:var(--sf);border:0;padding:5px 12px;font-size:13px;font-weight:600;color:var(--fg2)}
+.seg button+button{border-left:1px solid var(--bd)}.seg button[aria-pressed=true]{background:var(--accsoft);color:var(--acc)}
+.chart{position:relative;width:100%;outline-offset:4px}.chart svg{display:block;width:100%;touch-action:pan-y}
+.tip{position:absolute;pointer-events:none;background:var(--sf);border:1px solid var(--bd);border-radius:8px;box-shadow:var(--sh);padding:8px 10px;font-size:12.5px;min-width:150px;z-index:2;top:8px}
+.tip .h{color:var(--mut);font-size:12px;margin-bottom:4px}.tip .r{display:flex;gap:8px;justify-content:space-between}
+.leg{margin-top:6px;font-size:13px;color:var(--fg2)}.leg span{margin-right:14px}.leg i.g{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;background:var(--gap);border:1px solid var(--axis)}
+.sh{font-size:14px;font-weight:700;margin:22px 0 0}
+.cp{padding:12px;margin-bottom:12px}.cp h3{font-size:15px;margin:0 0 8px}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin:6px 0}
+#filtros{display:grid;gap:8px}#filtros .row{margin:0}#filtros input[type=text]{min-width:0}#filtros select{border:1px solid var(--bd);border-radius:6px;background:var(--sf);color:var(--fg);padding:5px 6px;min-width:0;max-width:100%}#filtros .val{width:84px}
+#aviso{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);max-width:90%;padding:10px 14px;border-radius:8px;background:var(--fg);color:var(--sf);font-size:14px;display:none;z-index:9}
 #aviso.bad{background:var(--bad);color:#fff}
-</style></head><body><main id="app"><h1>Rastreador de preços</h1><div id="v">Carregando…</div></main>
+.vazio{padding:40px 16px;text-align:center;color:var(--mut)}
+@media(max-width:900px){.split{grid-template-columns:minmax(0,1fr)}}
+</style></head><body><main><h1>Rastreador de preços</h1><div id="saude" class="cd saude">Carregando…</div>
+<div class="split"><div class="esq" id="esq"><div id="addbox"></div><div class="cd cp" id="filtros"></div><div id="lst"></div></div><div class="cd det" id="dir"><div class="vazio">Carregando…</div></div></div></main>
 <script>
-const $=s=>document.querySelector(s),v=$('#v');
+const $=s=>document.querySelector(s);
 const brl=n=>n==null?'—':n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const pct=n=>(n>0?'+':n<0?'−':'')+Math.abs(n).toFixed(1).replace('.',',')+'%';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const COR={amazon:'var(--amz)',terceiros:'var(--ter)',usado:'var(--usa)'},NOME={amazon:'Amazon',terceiros:'Terceiros',usado:'Usado'};
+const COR={amazon:'var(--amz)',terceiros:'var(--ter)',usado:'var(--usa)'},NOME={amazon:'Amazon',terceiros:'Terceiros',usado:'Usado'},LK=['amazon','terceiros','usado'];
 const ago=t=>{if(!t)return 'nunca';const m=Math.round((Date.now()-Date.parse(t))/60000);return m<1?'agora':m<60?m+' min atrás':m<1440?Math.round(m/60)+' h atrás':Math.round(m/1440)+' d atrás'};
+const hhmm=t=>new Date(t).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+const dm=t=>new Date(t).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+const dt=t=>dm(t)+' '+hhmm(t);
 const ST={ok:'Coletas em dia',atrasado:'Coletas atrasadas',sem_rodada:'Ainda sem rodada',falhando:'Coletas falhando'};
 async function get(u){const r=await fetch(u);if(!r.ok)throw new Error(r.status);return r.json()}
-let EDIT=false,ult='',tm;
+let tm;
 async function api(m,u,b){const r=await fetch(u,{method:m,headers:{'content-type':'application/json','x-painel':'1'},body:b===undefined?undefined:JSON.stringify(b)});let j={};try{j=await r.json()}catch(e){}if(!r.ok)throw new Error(j.erro||('Erro '+r.status));return j}
 function aviso(t,bad){let e=$('#aviso');if(!e){e=document.createElement('div');e.id='aviso';document.body.appendChild(e)}e.textContent=t;e.className=bad?'bad':'';e.style.display='block';clearTimeout(tm);tm=setTimeout(()=>e.style.display='none',bad?7000:3500)}
 async function rodar(btn,fn){if(btn)btn.disabled=true;try{await fn()}catch(e){aviso(e.message,1)}finally{if(btn)btn.disabled=false}}
-function spark(pts,w,h){if(pts.length<2)return '<svg width="'+w+'" height="'+h+'"></svg>';
+const hashAsin=()=>{const h=location.hash.slice(1);return /^[A-Z0-9]{10}$/.test(h)?h:null};
+const S={itens:[],edit:false,sel:hashAsin(),dias:14,visao:'grafico',det:null,ult:'',saude:null,hover:null};
+function status(i){const a=i.linhas.amazon;
+ if(i.pausado)return{k:'paused',t:'Pausado'};
+ if(!a.coletas)return{k:'',t:'Aguardando 1ª coleta'};
+ if(a.atual==null)return{k:'gap',t:'Amazon sem oferta'};
+ if(a.alvo==null)return{k:'',t:'Sem alvo'};
+ if(a.atual<=a.alvo)return{k:'below',t:'▼ Dentro do alvo'};
+ const p=(a.atual-a.alvo)/a.alvo*100;return{k:p>LIMITE_LARANJA?'hot':'warn',t:'▲ '+p.toFixed(1).replace('.',',')+'% acima do alvo'}}
+const LIMITE_LARANJA=20;/* % acima do alvo, (atual − alvo) / alvo: até aqui laranja, acima disso vermelho */
+const pill=s=>'<span class="pill '+s.k+'">'+esc(s.t)+'</span>';
+function foto(i,cls){return '<div class="foto">'+(i.imagem?'<img src="'+esc(i.imagem)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'<span>🛒</span>')+'</div>'}
+function degraus(pts,w,h,cor){if(pts.length<2)return '<svg class="sp" width="'+w+'" height="'+h+'"></svg>';
  const xs=pts.map(p=>Date.parse(p.t)),ys=pts.map(p=>p.v),x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
- const d=pts.map((p,i)=>(i?'L':'M')+((xs[i]-x0)/((x1-x0)||1)*w).toFixed(1)+' '+(h-2-(p.v-y0)/((y1-y0)||1)*(h-4)).toFixed(1)).join('');
- return '<svg width="'+w+'" height="'+h+'"><path d="'+d+'" fill="none" stroke="var(--amz)" stroke-width="1.5"/></svg>'}
-async function lista(){const d=await get('/api/itens'),s=d.saude;
- let h='<div class="saude"><b class="'+s.status+'">'+ST[s.status]+'</b> · última rodada '+ago(s.ultimaRodada)+' (a cada '+s.intervaloMin+' min) · '+s.itens+' itens'+(s.pausados?', '+s.pausados+' pausados':'')+(s.comFalhas?', <span style="color:var(--bad)">'+s.comFalhas+' com falha</span>':'')+'</div>';
- EDIT=!!d.edicao;
- if(EDIT)h+='<div class="card"><h3>Rastrear produtos</h3><textarea id="txt" rows="3" maxlength="4000" placeholder="Cole um ou mais links da Amazon (um por linha, até 20)"></textarea><button class="btn pri" id="add">Rastrear</button><div id="res">'+ult+'</div></div><div class="card"><h3>Importar do Keepa</h3><div class="mut">Em keepa.com/manage use o botão de exportar (CSV) e escolha o arquivo aqui. Só ASINs; o alvo você define depois.</div><input type="file" id="arq" accept=".csv,.txt,text/csv,text/plain"><div id="imp"></div></div>';
- h+='<div class="grade">';
- for(const i of d.itens){const l=i.linhas,am=l.amazon,alvo=am.alvo,atual=am.atual;
-  const foto=i.imagem?'<img src="'+esc(i.imagem)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'<span>🛒</span>';
-  const tags=(i.pausado?'<span class="tag">pausado</span>':'')+(i.silenciadoAte?'<span class="tag">alertas silenciados</span>':'')+(i.falhasSeguidas>0?'<span class="tag bad">falha na coleta</span>':'')+(atual!=null&&alvo!=null&&atual<=alvo?'<span class="tag ok">dentro do alvo</span>':'');
-  const vr=am.variacao;
-  h+='<div class="item" data-asin="'+esc(i.asin)+'"><div class="foto">'+foto+'</div><div class="nome">'+i.num+'. '+esc(i.titulo||i.asin)+'</div>'
-   +'<div class="mini"><div><div class="big">'+(atual!=null?brl(atual):'<span class="mut" style="font-size:14px;font-weight:400">'+(am.coletas?'Amazon não vende agora':'aguardando 1ª coleta')+'</span>')+'</div>'
-   +'<div class="mut">'+(alvo!=null?'alvo '+brl(alvo):'sem alvo')+(am.min!=null?' · mín 30d '+brl(am.min):'')+(vr!=null?' · '+(vr>0?'+':'')+vr.toFixed(1)+'%':'')+'</div></div>'+spark(i.mini,80,32)+'</div>'
-   +'<div class="mut">'+(l.terceiros.ligada?'Terceiros <span class="preco">'+brl(l.terceiros.atual)+'</span> ':'')+(l.usado.ligada?'Usado <span class="preco">'+brl(l.usado.atual)+'</span> ':'')+(am.coletas?am.coletas+' coletas':'')+'</div>'
-   +(tags?'<div>'+tags+'</div>':'')+'</div>'}
+ const X=t=>(2+(t-x0)/((x1-x0)||1)*(w-4)).toFixed(1),Y=v=>(3+(y1-v)/((y1-y0)||1)*(h-6)).toFixed(1);
+ const d=pts.map((p,i)=>i?'H'+X(xs[i])+'V'+Y(p.v):'M'+X(xs[i])+','+Y(p.v)).join('');
+ const l=pts[pts.length-1];
+ return '<svg class="sp" width="'+w+'" height="'+h+'"><path d="'+d+'" fill="none" stroke="'+cor+'" stroke-width="1.8" stroke-linejoin="round"/><circle cx="'+X(xs[xs.length-1])+'" cy="'+Y(l.v)+'" r="2.6" fill="'+cor+'"/></svg>'}
+
+function renderSaude(){const s=S.saude;if(!s)return;
+ const abaixo=S.itens.filter(i=>status(i).k==='below').length;
+ const prox=s.ultimaRodada?hhmm(Date.parse(s.ultimaRodada)+s.intervaloMin*60000):null;
+ $('#saude').innerHTML='<span><b class="st-'+s.status+'">'+ST[s.status]+'</b></span><span><b>Última coleta</b> '+(s.ultimaRodada?dt(s.ultimaRodada)+' ('+ago(s.ultimaRodada)+')':'nunca')+'</span>'+(prox?'<span><b>Próxima</b> ~'+prox+'</span>':'')+'<span>a cada '+s.intervaloMin+' min</span>'
+  +(s.rodadasFalhasSeguidas>0?'<span class="pill fail">! '+s.rodadasFalhasSeguidas+' rodadas seguidas com falha</span>':'')
+  +'<span><b>Itens</b> '+s.itens+(s.pausados?' · '+s.pausados+' pausados':'')+(s.comFalhas?' · <span style="color:var(--bad)">'+s.comFalhas+' com falha</span>':'')+' · '+abaixo+' dentro do alvo</span>'}
+
+const FK='painel-filtros-v1',F0={q:'',st:'',ln:'',min:'',max:'',ord:'num',dir:'asc'};
+let F=Object.assign({},F0);try{Object.assign(F,JSON.parse(localStorage.getItem(FK)||'{}'))}catch(e){}
+const salvaF=()=>{try{localStorage.setItem(FK,JSON.stringify(F))}catch(e){}};
+const sem=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+const nv=t=>{const n=Number(String(t).replace(/[^0-9,.]/g,'').replace(',','.'));return t===''||!isFinite(n)?null:n};
+function dist(i){const a=i.linhas.amazon;return a.atual!=null&&a.alvo!=null?(a.atual-a.alvo)/a.alvo*100:null}
+function queda(i){const m=i.mini;return m.length>1&&m[0].v?(m[m.length-1].v-m[0].v)/m[0].v*100:null}
+function ultima(i){const m=i.mini;return m.length?Date.parse(m[m.length-1].t):null}
+function preco(i){const a=i.linhas.amazon;if(a.atual!=null)return a.atual;const o=['terceiros','usado'].map(k=>i.linhas[k].atual).filter(v=>v!=null);return o.length?Math.min(...o):null}
+const FILTROS={'':'Todos os status',dentro:'Dentro do alvo',acima:'Acima do alvo',semalvo:'Sem alvo',pausado:'Pausados',falha:'Com falha na coleta',semoferta:'Amazon sem oferta',semcoleta:'Sem coleta ainda'};
+function passa(i){const a=i.linhas.amazon,t=sem(i.titulo)+' '+i.asin.toLowerCase();
+ if(F.q&&!F.q.split(/\s+/).every(w=>t.includes(sem(w))))return false;
+ switch(F.st){case 'dentro':if(!(a.atual!=null&&a.alvo!=null&&a.atual<=a.alvo))return false;break;
+  case 'acima':if(!(a.atual!=null&&a.alvo!=null&&a.atual>a.alvo))return false;break;
+  case 'semalvo':if(a.alvo!=null)return false;break;case 'pausado':if(!i.pausado)return false;break;
+  case 'falha':if(!(i.falhasSeguidas>0))return false;break;case 'semoferta':if(!(a.coletas&&a.atual==null))return false;break;
+  case 'semcoleta':if(a.coletas)return false;break}
+ if(F.ln&&!i.linhas[F.ln].ligada)return false;
+ const p=F.ln?i.linhas[F.ln].atual:preco(i),mn=nv(F.min),mx=nv(F.max);
+ if((mn!=null||mx!=null)&&p==null)return false;
+ if(mn!=null&&p<mn)return false;if(mx!=null&&p>mx)return false;return true}
+const ORD={num:['Ordem de cadastro',i=>i.num],nome:['Nome',i=>sem(i.titulo||i.asin)],preco:['Preço atual',preco],dist:['Distância até o alvo (%)',dist],var30:['Variação 30 dias',i=>i.linhas.amazon.variacao],queda:['Queda recente (7 dias)',queda],coleta:['Última coleta',ultima],criado:['Data de cadastro',i=>Date.parse(i.criadoEm)]};
+function visiveis(){const f=ORD[F.ord]||ORD.num,sg=F.dir==='desc'?-1:1;
+ return S.itens.filter(passa).map(i=>({i,k:f[1](i)})).sort((x,y)=>{
+  if(x.k==null||y.k==null)return x.k==null&&y.k==null?x.i.num-y.i.num:x.k==null?1:-1;
+  const c=typeof x.k==='string'?x.k.localeCompare(y.k,'pt-BR'):x.k-y.k;return c?c*sg:x.i.num-y.i.num}).map(o=>o.i)}
+function initFiltros(){const el=$('#filtros');
+ const opt=(o,v)=>Object.entries(o).map(([k,l])=>'<option value="'+k+'"'+(k===v?' selected':'')+'>'+esc(Array.isArray(l)?l[0]:l)+'</option>').join('');
+ el.innerHTML='<div class="row"><input type="text" id="fq" placeholder="Buscar por título ou ASIN" style="flex:1" value="'+esc(F.q)+'" aria-label="Buscar"></div>'
+  +'<div class="row"><select id="fst" aria-label="Status">'+opt(FILTROS,F.st)+'</select><select id="fln" aria-label="Linha de preço">'+opt({'':'Qualquer linha',terceiros:'Com Terceiros ligada',usado:'Com Usado ligada'},F.ln)+'</select></div>'
+  +'<div class="row"><span class="mut">Preço</span><input type="text" class="val" id="fmin" inputmode="decimal" placeholder="mín" value="'+esc(F.min)+'" aria-label="Preço mínimo"><input type="text" class="val" id="fmax" inputmode="decimal" placeholder="máx" value="'+esc(F.max)+'" aria-label="Preço máximo"></div>'
+  +'<div class="row"><select id="ford" aria-label="Ordenar por">'+opt(ORD,F.ord)+'</select><button type="button" class="btn sm" id="fdir" title="Inverter ordem">'+(F.dir==='desc'?'↓ Decrescente':'↑ Crescente')+'</button><button type="button" class="btn sm" id="flimpa">Limpar</button></div>'
+  +'<div class="mut" id="fcount"></div>';
+ const mudou=()=>{F.q=$('#fq').value;F.st=$('#fst').value;F.ln=$('#fln').value;F.min=$('#fmin').value.trim();F.max=$('#fmax').value.trim();F.ord=$('#ford').value;salvaF();renderEsq()};
+ for(const id of ['fq','fmin','fmax'])$('#'+id).oninput=mudou;for(const id of ['fst','fln','ford'])$('#'+id).onchange=mudou;
+ $('#fdir').onclick=e=>{F.dir=F.dir==='desc'?'asc':'desc';e.target.textContent=F.dir==='desc'?'↓ Decrescente':'↑ Crescente';salvaF();renderEsq()};
+ $('#flimpa').onclick=()=>{F=Object.assign({},F0);salvaF();initFiltros();renderEsq()}}
+function renderEsq(){let h='';
+ if(S.edit)h+='<details class="cd cp"'+(S.itens.length?'':' open')+'><summary style="cursor:pointer;font-weight:600">Rastrear produtos</summary><div style="margin-top:10px"><textarea id="txt" rows="3" maxlength="4000" placeholder="Cole um ou mais links da Amazon (um por linha, até 20)"></textarea><button class="btn pri" id="add">Rastrear</button><div id="res">'+S.ult+'</div>'
+  +'<h3 style="font-size:14px;margin:14px 0 4px">Importar do Keepa</h3><div class="mut">Em keepa.com/manage use o botão de exportar (CSV) e escolha o arquivo aqui. Só ASINs; o alvo você define depois.</div><input type="file" id="arq" accept=".csv,.txt,text/csv,text/plain"><div id="imp"></div></div></details>';
+ const add=h;h='<div class="lista">';const vis=visiveis();
+ for(const i of vis){const a=i.linhas.amazon,st=status(i);
+  const tags=(i.silenciadoAte?'<span class="pill">alertas silenciados</span>':'')+(i.falhasSeguidas>0?'<span class="pill fail">falha na coleta</span>':'');
+  const cor=a.coletas?COR.amazon:COR.terceiros;
+  const al=a.alvo,chips=a.atual!=null?[5,10,15].map(p=>{const v=Math.round(a.atual*(1-p/100));return '<button type="button" class="btn sm" data-cv="'+v+'" title="'+brl(v)+'">−'+p+'%</button>'}).join(''):'';
+  const alv=S.edit?'<div class="alv" data-asin="'+esc(i.asin)+'"><span class="mut">Alvo</span><input type="text" class="val" inputmode="decimal" placeholder="ex.: 449" value="'+(al!=null?String(al).replace('.',','):'')+'" aria-label="Alvo da Amazon do item '+i.num+'"><button type="button" class="btn sm pri" data-cs="1">Definir</button>'+chips+(al!=null?'<button type="button" class="btn sm" data-cx="1" title="Remover alvo">×</button>':'')+'</div>':'';
+  h+='<div class="itw'+(!(i.falhasSeguidas>0)&&{below:' in',warn:' warn',hot:' hot'}[st.k]||'')+(i.asin===S.sel?' sel':'')+'"><button type="button" class="item" data-asin="'+esc(i.asin)+'" aria-pressed="'+(i.asin===S.sel)+'">'+foto(i)
+   +'<span class="ti"><b>'+i.num+'. '+esc(i.titulo||i.asin)+'</b></span><span class="pr num">'+(a.atual!=null?brl(a.atual):'—')+'</span>'
+   +'<span class="stt">'+pill(st)+tags+'</span>'+degraus(i.mini,80,26,cor)+'</button>'+alv+'</div>'}
  h+='</div>';
- if(!d.itens.length)h+='<p class="mut">Nenhum item rastreado. Cole um link da Amazon acima ou no bot do Telegram.</p>';
- v.innerHTML=h;v.querySelectorAll('.item').forEach(e=>e.onclick=()=>detalhe(e.dataset.asin,14));
- if(EDIT){$('#add').onclick=e=>rodar(e.target,adicionar);$('#arq').onchange=e=>rodar(null,()=>importar(e.target));bindPickers(v)}}
+ if(!S.itens.length)h+='<div class="cd vazio">Nenhum item rastreado. Cole um link da Amazon acima ou no bot do Telegram.</div>';
+ else if(!vis.length)h+='<div class="cd vazio">Nenhum item com esses filtros.</div>';
+ $('#addbox').innerHTML=add;$('#lst').innerHTML=h;
+ const ct=$('#fcount');if(ct)ct.textContent=vis.length+' de '+S.itens.length+' itens';
+ $('#esq').querySelectorAll('.item').forEach(e=>e.onclick=()=>selecionar(e.dataset.asin));
+ $('#lst').querySelectorAll('.alv').forEach(c=>{const asin=c.dataset.asin,inp=c.querySelector('input'),
+  set=(b,val,msg)=>rodar(b,async()=>{await api('PUT','/api/itens/'+asin+'/alvo',{linha:'amazon',valor:val});aviso(msg);await carregar()});
+  c.querySelector('[data-cs]').onclick=e=>{const t=inp.value.trim();if(!t)return aviso('Digite um valor.',1);set(e.target,t,'Alvo salvo.')};
+  inp.onkeydown=e=>{if(e.key==='Enter')c.querySelector('[data-cs]').click()};
+  c.querySelectorAll('[data-cv]').forEach(b=>b.onclick=()=>set(b,Number(b.dataset.cv),'Alvo salvo.'));
+  const x=c.querySelector('[data-cx]');if(x)x.onclick=()=>set(x,null,'Alvo removido.')});
+ if(S.edit){$('#add').onclick=e=>rodar(e.target,adicionar);$('#arq').onchange=e=>rodar(null,()=>importar(e.target));bindPickers($('#addbox'))}}
+
 async function importar(inp){const f=inp.files[0];if(!f)return;if(f.size>6000)throw new Error('Arquivo grande demais (máx. ~500 ASINs).');
  const r=await api('POST','/api/importar',{texto:await f.text()});inp.value='';
  let t=r.importados+' importados';if(r.duplicados)t+=', '+r.duplicados+' já rastreados/repetidos';if(r.invalidos)t+=', '+r.invalidos+' inválidos';if(r.outrosPaises)t+=', '+r.outrosPaises+' de outros países ignorados';if(r.acimaDoLimite)t+=', '+r.acimaDoLimite+' acima do limite de 200 (importe de novo depois)';
- ult='<div class="row">Importação: '+esc(t)+'. Os preços aparecem nas próximas rodadas.</div>';await lista()}
+ S.ult='<div class="row">Importação: '+esc(t)+'. Os preços aparecem nas próximas rodadas.</div>';await carregar()}
 function tokens(t){const out=[];for(let x of t.split(/\\s+/)){if(!x)continue;if(/^(amzn\\.to|a\\.co)\\//i.test(x))x='https:'+'//'+x;if(/^https?:\\/\\//i.test(x)&&!out.includes(x))out.push(x)}return out}
 async function adicionar(){const ls=tokens($('#txt').value);if(!ls.length)throw new Error('Cole pelo menos um link da Amazon.');
  const lim=ls.slice(0,20),res=[];let h='';
@@ -83,52 +177,98 @@ async function adicionar(){const ls=tokens($('#txt').value);if(!ls.length)throw 
  for(const r of res){h+='<div class="row">'+(r.status==='novo'?'✓ Novo: ':r.status==='existente'?'• Já rastreado: ':'✗ ')+(r.item?esc(r.item.titulo||r.item.asin):esc(r.link)+' — '+esc(r.erro))+'</div>'}
  if(ls.length>20)h+='<div class="mut">Só os primeiros 20 links foram usados.</div>';
  if(novos.length===1)h+=picker(novos[0].item.asin,novos[0].item.amazonAtual);
- else if(novos.length)h+='<div class="mut">Abra cada item para definir o preço-alvo.</div>';
- ult=h;$('#txt').value='';await lista()}
-function picker(asin,atual){let h='<div class="card" data-picker="'+esc(asin)+'" style="margin-top:8px"><b>Qual o preço-alvo da linha Amazon?</b>'+(atual==null?'<div class="mut">A Amazon não vende este item agora; defina um alvo para quando ela voltar.</div>':'')+'<div class="row">';
+ else if(novos.length)h+='<div class="mut">Selecione cada item para definir o preço-alvo.</div>';
+ S.ult=h;$('#txt').value='';if(novos.length)S.sel=novos[novos.length-1].item.asin;await carregar()}
+function picker(asin,atual){let h='<div class="cd cp" data-picker="'+esc(asin)+'" style="margin-top:8px"><b>Qual o preço-alvo da linha Amazon?</b>'+(atual==null?'<div class="mut">A Amazon não vende este item agora; defina um alvo para quando ela voltar.</div>':'')+'<div class="row">';
  if(atual!=null)for(const p of [5,10,15]){const v=Math.round(atual*(1-p/100));h+='<button class="btn" data-v="'+v+'">−'+p+'% · '+brl(v)+'</button>'}
  return h+'<input type="text" class="val" inputmode="decimal" placeholder="ex.: 449"><button class="btn pri" data-custom="1">Definir</button><button class="btn" data-skip="1">Sem alvo por enquanto</button></div></div>'}
-function bindPickers(root){root.querySelectorAll('[data-picker]').forEach(c=>{const asin=c.dataset.picker,set=(btn,val)=>rodar(btn,async()=>{await api('PUT','/api/itens/'+asin+'/alvo',{linha:'amazon',valor:val});ult='';aviso('Alvo definido: '+brl(typeof val==='number'?val:Number(String(val).replace(/[^0-9,.]/g,'').replace(',','.'))));await lista()});
+function bindPickers(root){root.querySelectorAll('[data-picker]').forEach(c=>{const asin=c.dataset.picker,set=(btn,val)=>rodar(btn,async()=>{await api('PUT','/api/itens/'+asin+'/alvo',{linha:'amazon',valor:val});S.ult='';aviso('Alvo definido: '+brl(typeof val==='number'?val:Number(String(val).replace(/[^0-9,.]/g,'').replace(',','.'))));await carregar()});
  c.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>set(b,Number(b.dataset.v)));
  c.querySelector('[data-custom]').onclick=e=>{const t=c.querySelector('input').value.trim();if(!t)return aviso('Digite um valor.',1);set(e.target,t)};
- c.querySelector('[data-skip]').onclick=()=>{ult='';lista()}})}
-function grafico(d){const W=840,H=260,L=56,B=22,T=8,x0=Date.parse(d.desde),x1=Date.now();
- const todos=Object.entries(d.series).filter(([k])=>d.linhas[k].ligada).flatMap(([,a])=>a.map(p=>p.v));
- if(!todos.length)return '<p class="mut">Sem coletas neste período.</p>';
- let y0=Math.min(...todos),y1=Math.max(...todos);if(y0===y1){y0*=.95;y1*=1.05}const pad=(y1-y0)*.08;y0-=pad;y1+=pad;
- const X=t=>L+(Date.parse(t)-x0)/(x1-x0)*(W-L-8),Y=p=>T+(1-(p-y0)/(y1-y0))*(H-T-B);
- let s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Histórico de preços">';
- for(let i=0;i<=4;i++){const p=y0+(y1-y0)*i/4,y=Y(p);s+='<line x1="'+L+'" x2="'+(W-8)+'" y1="'+y+'" y2="'+y+'" stroke="var(--bd)"/><text x="'+(L-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="11" fill="var(--mut)">'+Math.round(p)+'</text>'}
- for(const g of d.semAmazon){const a=Math.max(L,X(g.de)),b=Math.min(W-8,X(g.ate));s+='<rect x="'+a+'" y="'+T+'" width="'+Math.max(2,b-a)+'" height="'+(H-T-B)+'" fill="var(--gap)"><title>Amazon não vendeu</title></rect>'}
- for(const k of ['amazon','terceiros','usado']){if(!d.linhas[k].ligada||!d.series[k].length)continue;
-  const pts=d.series[k],path=pts.map((p,i)=>(i?'L':'M')+X(p.t).toFixed(1)+' '+Y(p.v).toFixed(1)).join('');
-  s+='<path d="'+path+'" fill="none" stroke="'+COR[k]+'" stroke-width="2"/>'+pts.map(p=>'<circle cx="'+X(p.t).toFixed(1)+'" cy="'+Y(p.v).toFixed(1)+'" r="2.5" fill="'+COR[k]+'"><title>'+NOME[k]+' '+brl(p.v)+' · '+new Date(p.t).toLocaleString('pt-BR')+'</title></circle>').join('')}
- return s+'</svg>'}
-async function detalhe(asin,dias){const d=await get('/api/itens/'+asin+'?dias='+dias);
- let h='<button class="back">← Itens</button><h2 style="font-size:17px;margin:0 0 4px">'+esc(d.titulo||d.asin)+'</h2><div class="mut">'+d.asin+'</div>';
- h+='<div class="dias" style="margin:12px 0">'+[7,14,30].map(n=>'<button data-n="'+n+'" class="'+(n===dias?'on':'')+'">'+n+' dias</button>').join('')+'</div>';
- h+='<div class="leg">'+['amazon','terceiros','usado'].filter(k=>d.linhas[k].ligada).map(k=>'<span><i style="background:'+COR[k]+'"></i>'+NOME[k]+' '+brl(d.linhas[k].atual)+(d.linhas[k].min!=null?' <span class="mut">(mín '+brl(d.linhas[k].min)+')</span>':'')+'</span>').join('')+'<span><i style="background:var(--gap)"></i>Amazon não vendeu</span></div>';
- h+=grafico(d);
- h+='<table><tr><th>Linha</th><th class="n">Atual</th><th class="n">Mínimo</th><th class="n">Máximo</th><th class="n">Variação</th><th class="n">Coletas</th></tr>'+['amazon','terceiros','usado'].filter(k=>d.linhas[k].ligada).map(k=>{const l=d.linhas[k];return '<tr><td>'+NOME[k]+'</td><td class="n">'+brl(l.atual)+'</td><td class="n">'+brl(l.min)+'</td><td class="n">'+brl(l.max)+'</td><td class="n">'+(l.variacao==null?'—':(l.variacao>0?'+':'')+l.variacao.toFixed(1)+'%')+'</td><td class="n">'+l.coletas+'</td></tr>'}).join('')+'</table><div class="mut">Últimos 30 dias.</div>';
- h+='<h3 style="font-size:15px;margin:16px 0 0">Ofertas na última coleta <span class="mut">'+(d.ofertasEm?ago(d.ofertasEm):'')+'</span></h3>';
- h+=d.ofertas.length?'<table><tr><th>Vendedor</th><th>Condição</th><th>Envio</th><th class="n">Preço</th><th class="n">Frete</th></tr>'+d.ofertas.map(o=>'<tr class="'+(o.descartada?'desc':'')+'"><td>'+esc(o.vendedor)+(o.descartada?' (suspeita)':'')+'</td><td>'+esc(o.condicao)+'</td><td>'+esc(o.envio)+'</td><td class="n">'+brl(o.preco)+'</td><td class="n">'+(o.frete==null?'—':brl(o.frete))+'</td></tr>').join('')+'</table>':'<p class="mut">Sem ofertas registradas.</p>';
- v.innerHTML=h;v.querySelector('.back').onclick=()=>{ult='';lista()};v.querySelectorAll('.dias button').forEach(b=>b.onclick=()=>detalhe(asin,+b.dataset.n));if(EDIT)acoes(d,dias)}
-function acoes(d,dias){const L=d.linhas,box=document.createElement('div'),A='/api/itens/'+d.asin;
- let h='<div class="card" style="margin-top:16px"><h3>Preço-alvo</h3>';
- for(const k of ['amazon','terceiros','usado']){if(!L[k].ligada)continue;h+='<div class="row" data-k="'+k+'"><span class="l">'+NOME[k]+'</span><span class="mut">alvo: '+(L[k].alvo!=null?brl(L[k].alvo):'sem alvo')+'</span><input type="text" class="val" inputmode="decimal" placeholder="ex.: 449"><button class="btn pri" data-a="salvar">Salvar</button>'+(L[k].alvo!=null?'<button class="btn" data-a="limpar">Remover alvo</button>':'')+'</div>'}
- h+='<div class="mut">Você é avisado no Telegram quando o preço ficar igual ou abaixo do alvo.</div></div>';
- h+='<div class="card"><h3>Linhas de preço</h3>';
- for(const k of ['terceiros','usado'])h+='<div class="row"><span class="l">'+NOME[k]+'</span><span class="mut">'+(L[k].ligada?'ligada':'desligada')+'</span><button class="btn" data-l="'+k+'">'+(L[k].ligada?'Desligar':'Ligar')+'</button></div>';
- h+='<div class="mut">Ligar uma linha lê o produto agora e passa a usar 2 requisições por rodada.</div></div>';
- h+='<div class="card"><h3>Item</h3><div class="row"><button class="btn" data-p="1">'+(d.pausado?'Retomar coletas':'Pausar coletas')+'</button><button class="btn" data-s="1">'+(d.silenciadoAte?'Reativar alertas':'Silenciar alertas por 24 h')+'</button>'+(d.url&&d.url.startsWith('https:'+'//www.amazon.com.br/')?'<a class="btn" href="'+esc(d.url)+'" target="_blank" rel="noopener noreferrer" style="text-decoration:none">Abrir na Amazon</a>':'')+'<button class="btn bad" data-r="1">Remover item</button></div>'+(d.silenciadoAte?'<div class="mut">Alertas silenciados até '+new Date(d.silenciadoAte).toLocaleString('pt-BR')+'</div>':'')+'</div>';
- box.innerHTML=h;v.appendChild(box);
- const re=()=>detalhe(d.asin,dias);
- box.querySelectorAll('.row[data-k]').forEach(r=>{const k=r.dataset.k,put=(b,val,msg)=>rodar(b,async()=>{await api('PUT',A+'/alvo',{linha:k,valor:val});aviso(msg);await re()});
-  r.querySelector('[data-a=salvar]').onclick=e=>{const t=r.querySelector('input').value.trim();if(!t)return aviso('Digite um valor.',1);put(e.target,t,'Alvo salvo.')};
-  const lp=r.querySelector('[data-a=limpar]');if(lp)lp.onclick=e=>put(e.target,null,'Alvo removido.')});
- box.querySelectorAll('[data-l]').forEach(b=>b.onclick=()=>rodar(b,async()=>{const k=b.dataset.l,on=!L[k].ligada;if(on)aviso('Lendo o produto…');const j=await api('PUT',A+'/linhas',{linha:k,ligada:on});aviso(on?(j.leitura==='ok'?'Linha ligada.':'Linha ligada, mas não consegui ler agora; entra na próxima rodada.'):'Linha desligada. O histórico fica guardado.',on&&j.leitura!=='ok');await re()}));
- box.querySelector('[data-p]').onclick=e=>rodar(e.target,async()=>{await api('PUT',A+'/pausa',{pausado:!d.pausado});aviso(d.pausado?'Coletas retomadas.':'Item pausado: sem coletas nem alertas.');await re()});
- box.querySelector('[data-s]').onclick=e=>rodar(e.target,async()=>{await api('PUT',A+'/silencio',{silenciado:!d.silenciadoAte});aviso(d.silenciadoAte?'Alertas reativados.':'Sem alertas por 24 h.');await re()});
- box.querySelector('[data-r]').onclick=e=>{if(!confirm('Remover este item e apagar o histórico?'))return;rodar(e.target,async()=>{await api('DELETE',A);aviso('Item removido. Os demais foram renumerados.');ult='';await lista()})}}
-lista().catch(()=>{v.textContent='Não foi possível carregar os dados.'});
+ c.querySelector('[data-skip]').onclick=()=>{S.ult='';renderEsq()}})}
+
+/* gráfico em degraus: linhas, faixas sem Amazon, alvos tracejados e cursor com os valores de todas as linhas */
+function tempos(d){const s=new Set();for(const k of LK)if(d.linhas[k].ligada)for(const p of d.series[k])s.add(p.t);return [...s].sort()}
+function valorEm(d,k,t){const p=d.series[k].find(x=>x.t===t);return p?p.v:null}
+function grafico(d){const host=$('#chart');if(!host)return;const W=host.clientWidth||840,H=290,L=62,R=14,T=14,B=28,x0=Date.parse(d.desde),x1=Date.now();
+ const ls=LK.filter(k=>d.linhas[k].ligada);
+ let vals=ls.flatMap(k=>d.series[k].map(p=>p.v));
+ if(!vals.length){host.innerHTML='<p class="mut">Sem coletas neste período.</p>';return}
+ for(const k of ls)if(d.linhas[k].alvo!=null)vals.push(d.linhas[k].alvo);
+ let y0=Math.min(...vals),y1=Math.max(...vals);const sp=Math.max(y1-y0,y1*.05);y0-=sp*.12;y1+=sp*.12;
+ const pw=W-L-R,ph=H-T-B,X=t=>L+(Date.parse(t)-x0)/(x1-x0)*pw,Y=v=>T+(1-(v-y0)/(y1-y0))*ph;
+ let s='';
+ for(let i=0;i<=4;i++){const p=y0+(y1-y0)*i/4,y=Y(p);s+='<line x1="'+L+'" x2="'+(L+pw)+'" y1="'+y.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="var(--grid)"/><text x="'+(L-8)+'" y="'+(y+4).toFixed(1)+'" text-anchor="end" font-size="11.5" fill="var(--mut)">R$ '+Math.round(p).toLocaleString('pt-BR')+'</text>'}
+ for(const g of d.semAmazon){const a=Math.max(L,X(g.de)),b=Math.min(L+pw,X(g.ate));s+='<rect x="'+a.toFixed(1)+'" y="'+T+'" width="'+Math.max(2,b-a).toFixed(1)+'" height="'+ph+'" fill="var(--gap)"><title>Amazon não vendeu</title></rect>'+(b-a>96?'<text x="'+(a+8).toFixed(1)+'" y="'+(T+14)+'" font-size="11.5" fill="var(--mut)">Amazon sem oferta</text>':'')}
+ s+='<line x1="'+L+'" x2="'+(L+pw)+'" y1="'+(T+ph)+'" y2="'+(T+ph)+'" stroke="var(--axis)"/>';
+ const passo=S.dias<=7?1:S.dias<=14?2:5;
+ for(let n=0;n*passo<=S.dias;n++){const t=x1-n*passo*86400000;if(t<x0)break;const x=L+(t-x0)/(x1-x0)*pw;s+='<text x="'+x.toFixed(1)+'" y="'+(H-8)+'" text-anchor="'+(n===0?'end':'middle')+'" font-size="11.5" fill="var(--mut)">'+(n===0?'agora':dm(t))+'</text>'}
+ for(const k of ls){const a=d.linhas[k].alvo;if(a==null)continue;s+='<line x1="'+L+'" x2="'+(L+pw)+'" y1="'+Y(a).toFixed(1)+'" y2="'+Y(a).toFixed(1)+'" stroke="'+COR[k]+'" stroke-width="1.5" stroke-dasharray="5 4"/><text x="'+(L+pw-4)+'" y="'+(Y(a)-5).toFixed(1)+'" text-anchor="end" font-size="11.5" fill="var(--fg2)">Alvo '+(k==='amazon'?'':NOME[k]+' ')+brl(a)+'</text>'}
+ for(const k of ls.slice().reverse()){const pts=d.series[k];if(!pts.length)continue;
+  const path=pts.map((p,i)=>i?'H'+X(p.t).toFixed(1)+'V'+Y(p.v).toFixed(1):'M'+X(p.t).toFixed(1)+','+Y(p.v).toFixed(1)).join(''),l=pts[pts.length-1];
+  s+='<path d="'+path+'" fill="none" stroke="'+COR[k]+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'+(pts.length===1?'<circle cx="'+X(l.t).toFixed(1)+'" cy="'+Y(l.v).toFixed(1)+'" r="3" fill="'+COR[k]+'"/>':'')+'<circle cx="'+X(l.t).toFixed(1)+'" cy="'+Y(l.v).toFixed(1)+'" r="4.5" fill="'+COR[k]+'" stroke="var(--sf)" stroke-width="2"/>'}
+ const ts=tempos(d);
+ s+='<g id="hv"></g><rect x="'+L+'" y="0" width="'+pw+'" height="'+(T+ph)+'" fill="transparent" data-hit="1"/>';
+ host.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" height="'+H+'" role="img" aria-label="Histórico de preços. Use as setas para ler cada coleta.">'+s+'</svg><div class="tip" id="tip" hidden></div>';
+ const hover=()=>{const hv=host.querySelector('#hv'),tp=host.querySelector('#tip');
+  if(S.hover==null||!ts[S.hover]){hv.innerHTML='';tp.hidden=true;return}
+  const t=ts[S.hover],hx=X(t);let g='<line x1="'+hx.toFixed(1)+'" x2="'+hx.toFixed(1)+'" y1="'+T+'" y2="'+(T+ph)+'" stroke="var(--fg2)"/>',linhas='';
+  for(const k of ls){const v=valorEm(d,k,t);if(v!=null)g+='<circle cx="'+hx.toFixed(1)+'" cy="'+Y(v).toFixed(1)+'" r="4.5" fill="'+COR[k]+'" stroke="var(--sf)" stroke-width="2"/>';
+   linhas+='<div class="r"><span><i class="key" style="--c:'+COR[k]+'"></i>'+NOME[k]+'</span><b class="num">'+(v==null?'sem oferta':brl(v))+'</b></div>'}
+  hv.innerHTML=g;tp.innerHTML='<div class="h">'+dt(t)+'</div>'+linhas;tp.hidden=false;
+  tp.style.left=Math.max(0,hx+14>W-170?hx-184:hx+14).toFixed(0)+'px'};
+ hover();
+ const idx=e=>{const r=host.querySelector('svg').getBoundingClientRect(),f=Math.max(0,Math.min(1,((e.clientX-r.left)-L)/pw)),tt=x0+f*(x1-x0);let b=0,bd=Infinity;ts.forEach((t,i)=>{const dd=Math.abs(Date.parse(t)-tt);if(dd<bd){bd=dd;b=i}});return b};
+ const hit=host.querySelector('[data-hit]');
+ hit.onpointermove=hit.onpointerdown=e=>{S.hover=idx(e);hover()};
+ hit.onpointerleave=e=>{if(e.pointerType==='mouse'){S.hover=null;hover()}};
+ host.onkeydown=e=>{if(!ts.length)return;if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();const c=S.hover==null?ts.length-1:S.hover;S.hover=Math.max(0,Math.min(ts.length-1,c+(e.key==='ArrowLeft'?-1:1)));hover()}else if(e.key==='Escape'){S.hover=null;hover()}}}
+
+function tabelaColetas(d){const ts=tempos(d).slice(-24).reverse(),ls=LK.filter(k=>d.linhas[k].ligada);
+ if(!ts.length)return '<p class="mut">Sem coletas neste período.</p>';
+ return '<div class="tw"><table><tr><th>Coleta</th>'+ls.map(k=>'<th class="n">'+NOME[k]+'</th>').join('')+'</tr>'+ts.map(t=>'<tr><td class="num">'+dt(t)+'</td>'+ls.map(k=>{const v=valorEm(d,k,t);return '<td class="n num">'+(v==null?'<span class="mut">sem oferta</span>':brl(v))+'</td>'}).join('')+'</tr>').join('')+'</table></div><div class="mut" style="margin-top:6px">Últimas 24 coletas do período.</div>'}
+
+function melhores(of){const m={};for(const o of of){if(o.descartada)continue;const t=o.preco+(o.frete||0);if(m[o.condicao]==null||t<m[o.condicao])m[o.condicao]=t}return m}
+function renderDir(){const d=S.det,it=S.itens.find(x=>x.asin===S.sel);
+ if(!d||!it){$('#dir').innerHTML='<div class="vazio">'+(S.itens.length?'Selecione um item.':'Nenhum item selecionado.')+'</div>';return}
+ const L=d.linhas,st=status(it),url=d.url&&d.url.startsWith('https:'+'//www.amazon.com.br/')?d.url:null;
+ let h='<div class="dh"><div style="display:flex;gap:14px;min-width:0">'+foto(it)+'<div><h2>'+esc(d.titulo||d.asin)+'</h2><div class="meta"><span class="mono">#'+d.num+' · '+esc(d.asin)+'</span>'+pill(st)+(d.silenciadoAte?'<span class="pill">alertas silenciados até '+esc(new Date(d.silenciadoAte).toLocaleString('pt-BR'))+'</span>':'')+'</div></div></div>';
+ h+='<div class="act">'+(url?'<a class="btn sm" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Abrir na Amazon</a>':'')+(S.edit?'<button class="btn sm" data-p="1">'+(d.pausado?'Retomar':'Pausar')+'</button><button class="btn sm" data-s="1">'+(d.silenciadoAte?'Reativar alertas':'Silenciar 24 h')+'</button><button class="btn sm bad" data-r="1">Remover</button>':'')+'</div></div>';
+ h+='<div class="tw"><table><tr><th>Linha de preço</th><th class="n">Agora</th><th class="n">Alvo</th><th class="n">Mín 30 d</th><th class="n">Máx 30 d</th><th class="n">Variação</th>'+(S.edit?'<th>Coleta</th>':'')+'</tr>';
+ LK.forEach((k,idx)=>{const l=L[k],on=l.ligada;
+  h+='<tr data-k="'+k+'"><td><i class="key" style="--c:'+COR[k]+'"></i><b style="font-weight:600">'+NOME[k]+'</b>'+(idx===0?' <span class="pill">principal</span>':'')+'</td>'
+   +'<td class="n num">'+(on?(l.atual!=null?brl(l.atual):'<span class="mut">sem oferta</span>'):'<span class="mut">—</span>')+'</td>'
+   +'<td class="n">'+(S.edit?'<input type="text" class="val" inputmode="decimal" data-alvo="'+k+'" value="'+(l.alvo!=null?String(l.alvo).replace('.',','):'')+'" placeholder="sem alvo" aria-label="Alvo da linha '+NOME[k]+'"'+(on?'':' disabled')+'>':(l.alvo!=null?brl(l.alvo):'—'))+'</td>'
+   +'<td class="n num">'+(on?brl(l.min):'—')+'</td><td class="n num">'+(on?brl(l.max):'—')+'</td><td class="n num">'+(on&&l.variacao!=null?pct(l.variacao):'—')+'</td>'
+   +(S.edit?'<td>'+(idx===0?'<span class="mut">sempre</span>':'<label><input type="checkbox" data-linha="'+k+'" '+(on?'checked':'')+'> coletar</label>')+'</td>':'')+'</tr>'});
+ h+='</table></div>'+(S.edit?'<div class="mut" style="margin-top:6px">Aviso no Telegram quando o preço ficar igual ou abaixo do alvo. Deixe o campo vazio para remover o alvo. Ligar Terceiros ou Usado usa 2 requisições por rodada.</div>':'');
+ h+='<div class="bar"><div class="seg">'+[7,14,30].map(n=>'<button type="button" data-n="'+n+'" aria-pressed="'+(n===S.dias)+'">'+n+' dias</button>').join('')+'</div><div class="seg"><button type="button" data-vz="grafico" aria-pressed="'+(S.visao==='grafico')+'">Gráfico</button><button type="button" data-vz="tabela" aria-pressed="'+(S.visao==='tabela')+'">Tabela</button></div></div>';
+ if(S.visao==='grafico')h+='<div class="chart" id="chart" tabindex="0"></div><div class="leg">'+LK.filter(k=>L[k].ligada).map(k=>'<span><i class="key" style="--c:'+COR[k]+'"></i>'+NOME[k]+'</span>').join('')+'<span><i class="g"></i>Amazon não vendeu</span><span><i class="key" style="--c:var(--fg2);border-top-style:dashed"></i>Alvo</span></div>';
+ else h+=tabelaColetas(d);
+ h+='<div class="sh">Ofertas na última coleta <span class="mut">'+(d.ofertasEm?ago(d.ofertasEm):'')+'</span></div>';
+ const best=melhores(d.ofertas);
+ h+=d.ofertas.length?'<div class="tw"><table><tr><th>Vendedor</th><th>Condição</th><th>Envio</th><th class="n">Preço</th><th class="n">Frete</th><th class="n">Total</th></tr>'+d.ofertas.map(o=>{const tot=o.preco+(o.frete||0),menor=!o.descartada&&best[o.condicao]===tot;return '<tr class="'+(o.descartada?'desc':menor?'best':'')+'"><td>'+esc(o.vendedor)+(o.descartada?' <span class="pill fail" style="text-decoration:none">descartada (suspeita)</span>':'')+(menor?' <span class="pill below">menor</span>':'')+'</td><td>'+esc(o.condicao)+'</td><td>'+esc(o.envio)+'</td><td class="n num">'+brl(o.preco)+'</td><td class="n num">'+(o.frete==null?'—':o.frete?brl(o.frete):'grátis')+'</td><td class="n num">'+brl(tot)+'</td></tr>'}).join('')+'</table></div>':'<p class="mut">Sem ofertas registradas.</p>';
+ $('#dir').innerHTML=h;
+ const dir=$('#dir'),A='/api/itens/'+d.asin,re=()=>detalhe();
+ dir.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{S.dias=+b.dataset.n;S.hover=null;detalhe()});
+ dir.querySelectorAll('[data-vz]').forEach(b=>b.onclick=()=>{S.visao=b.dataset.vz;S.hover=null;renderDir()});
+ if(S.visao==='grafico'){grafico(d);if(window.ResizeObserver){S.ro&&S.ro.disconnect();S.ro=new ResizeObserver(()=>grafico(d));S.ro.observe($('#chart'))}}
+ if(!S.edit)return;
+ dir.querySelectorAll('[data-alvo]').forEach(i=>{const k=i.dataset.alvo,salvar=()=>{const t=i.value.trim();if((t===''?null:t)===(L[k].alvo!=null?String(L[k].alvo).replace('.',','):null))return;rodar(i,async()=>{await api('PUT',A+'/alvo',{linha:k,valor:t===''?null:t});aviso(t===''?'Alvo removido.':'Alvo salvo.');await carregar()})};
+  i.onchange=salvar;i.onkeydown=e=>{if(e.key==='Enter')i.blur()}});
+ dir.querySelectorAll('[data-linha]').forEach(b=>b.onchange=()=>rodar(b,async()=>{const k=b.dataset.linha,on=b.checked;if(on)aviso('Lendo o produto…');const j=await api('PUT',A+'/linhas',{linha:k,ligada:on});aviso(on?(j.leitura==='ok'?'Linha ligada.':'Linha ligada, mas não consegui ler agora; entra na próxima rodada.'):'Linha desligada. O histórico fica guardado.',on&&j.leitura!=='ok');await carregar()}));
+ dir.querySelector('[data-p]').onclick=e=>rodar(e.target,async()=>{await api('PUT',A+'/pausa',{pausado:!d.pausado});aviso(d.pausado?'Coletas retomadas.':'Item pausado: sem coletas nem alertas.');await carregar()});
+ dir.querySelector('[data-s]').onclick=e=>rodar(e.target,async()=>{await api('PUT',A+'/silencio',{silenciado:!d.silenciadoAte});aviso(d.silenciadoAte?'Alertas reativados.':'Sem alertas por 24 h.');await carregar()});
+ dir.querySelector('[data-r]').onclick=e=>{if(!confirm('Remover este item e apagar o histórico?'))return;rodar(e.target,async()=>{await api('DELETE',A);aviso('Item removido. Os demais foram renumerados.');S.sel=null;S.ult='';await carregar()})}}
+
+async function detalhe(){if(!S.sel){S.det=null;renderDir();return}
+ try{S.det=await get('/api/itens/'+S.sel+'?dias='+S.dias)}catch(e){S.det=null;S.sel=null}
+ renderDir()}
+function selecionar(asin){S.sel=asin;S.hover=null;try{history.replaceState(null,'','#'+asin)}catch(e){}renderEsq();detalhe();if(innerWidth<=900)$('#dir').scrollIntoView({behavior:'smooth',block:'start'})}
+async function carregar(){const d=await get('/api/itens');S.itens=d.itens;S.edit=!!d.edicao;S.saude=d.saude;
+ if(!S.itens.some(i=>i.asin===S.sel))S.sel=S.itens.length?S.itens[0].asin:null;
+ renderSaude();renderEsq();await detalhe()}
+initFiltros();
+carregar().catch(()=>{$('#dir').innerHTML='<div class="vazio">Não foi possível carregar os dados.</div>'});
+setInterval(()=>{if(document.hidden||document.activeElement&&/INPUT|TEXTAREA/.test(document.activeElement.tagName))return;carregar().catch(()=>{})},120000);
 </script></body></html>`;
