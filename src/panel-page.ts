@@ -58,7 +58,7 @@ async function lista(){const d=await get('/api/itens'),s=d.saude;
  if(EDIT)h+='<div class="card"><h3>Rastrear produtos</h3><textarea id="txt" rows="3" maxlength="4000" placeholder="Cole um ou mais links da Amazon (um por linha, até 20)"></textarea><button class="btn pri" id="add">Rastrear</button><div id="res">'+ult+'</div></div><div class="card"><h3>Importar do Keepa</h3><div class="mut">Em keepa.com/manage use o botão de exportar (CSV) e escolha o arquivo aqui. Só ASINs; o alvo você define depois.</div><input type="file" id="arq" accept=".csv,.txt,text/csv,text/plain"><div id="imp"></div></div>';
  h+='<div class="grade">';
  for(const i of d.itens){const l=i.linhas,am=l.amazon,alvo=am.alvo,atual=am.atual;
-  const foto=i.imagem?'<img src="'+esc(i.imagem)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'<span>🛒</span>';
+  const foto=i.imagem?'<img src="'+esc(i.imagem)+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.textContent=\\'🛒\\'">':'<span>🛒</span>';
   const tags=(i.pausado?'<span class="tag">pausado</span>':'')+(i.silenciadoAte?'<span class="tag">alertas silenciados</span>':'')+(i.falhasSeguidas>0?'<span class="tag bad">falha na coleta</span>':'')+(atual!=null&&alvo!=null&&atual<=alvo?'<span class="tag ok">dentro do alvo</span>':'');
   const vr=am.variacao;
   h+='<div class="item" data-asin="'+esc(i.asin)+'"><div class="foto">'+foto+'</div><div class="nome">'+i.num+'. '+esc(i.titulo||i.asin)+'</div>'
