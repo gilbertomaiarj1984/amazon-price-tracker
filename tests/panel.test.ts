@@ -485,3 +485,13 @@ test("arrastar rola a lista da esquerda (e a página) perto das bordas", async (
   expect(js).toContain("autoRolar(true)");
   expect(js).toContain("autoRolar(false)");
 });
+
+test("grupos da lista começam fechados e a busca olha dentro e fora deles", async () => {
+  const html = await (await get("/")).text();
+  const js = html.split("<script>")[1]!.split("</script>")[0]!;
+  expect(() => new Function(js)).not.toThrow();
+  expect(js).toContain("abertos:new Set()");
+  expect(js).toContain("aberto=S.abertos.has(gid)");
+  expect(js).toMatch(/buscando&&aqui\.length>0/);
+  expect(js).toContain("sem(i.grupoId!=null?gnome(i.grupoId):'')");
+});

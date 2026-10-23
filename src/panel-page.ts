@@ -85,7 +85,7 @@ async function api(m,u,b){const r=await fetch(u,{method:m,headers:{'content-type
 function aviso(t,bad){let e=$('#aviso');if(!e){e=document.createElement('div');e.id='aviso';document.body.appendChild(e)}e.textContent=t;e.className=bad?'bad':'';e.style.display='block';clearTimeout(tm);tm=setTimeout(()=>e.style.display='none',bad?7000:3500)}
 async function rodar(btn,fn){if(btn)btn.disabled=true;try{await fn()}catch(e){aviso(e.message,1)}finally{if(btn)btn.disabled=false}}
 const hashAsin=()=>{const h=location.hash.slice(1);return /^[A-Z0-9]{10}$/.test(h)?h:null};
-const S={itens:[],grupos:[],gsel:null,gdet:null,edit:false,sel:hashAsin(),dias:14,visao:'grafico',det:null,ult:'',saude:null,hover:null};
+const S={abertos:new Set(),itens:[],grupos:[],gsel:null,gdet:null,edit:false,sel:hashAsin(),dias:14,visao:'grafico',det:null,ult:'',saude:null,hover:null};
 const MOTIVOS={captcha:'captcha da Amazon',http_503:'Amazon respondeu 503',http_error:'erro HTTP',vazio:'página vazia',html_inesperado:'página em formato inesperado',erro_rede:'falha de rede'};
 const motivo=m=>MOTIVOS[m]||m||'motivo desconhecido';
 /* nunca = ainda sem leitura; erro = leitura falhou e nada foi gravado; ok = leu (a Amazon pode não ter oferta) */
@@ -127,7 +127,7 @@ function preco(i){const a=i.linhas.amazon;if(a.atual!=null)return a.atual;const 
 const gmap=()=>Object.fromEntries(S.grupos.map(g=>[String(g.id),g.nome]));
 const gnome=id=>(S.grupos.find(g=>g.id===id)||{}).nome;
 const FILTROS={'':'Todos os status',dentro:'Dentro do alvo',acima:'Acima do alvo',semalvo:'Sem alvo',pausado:'Pausados',falha:'Com falha na coleta',semoferta:'Amazon sem oferta',semcoleta:'Sem coleta ainda'};
-function passa(i){const a=i.linhas.amazon,t=sem(i.titulo)+' '+i.asin.toLowerCase();
+function passa(i){const a=i.linhas.amazon,t=sem(i.titulo)+' '+i.asin.toLowerCase()+' '+sem(i.grupoId!=null?gnome(i.grupoId):'');
  if(F.q&&!F.q.split(/\\s+/).every(w=>t.includes(sem(w))))return false;
  switch(F.st){case 'dentro':if(!(a.atual!=null&&a.alvo!=null&&a.atual<=a.alvo))return false;break;
   case 'acima':if(!(a.atual!=null&&a.alvo!=null&&a.atual>a.alvo))return false;break;
@@ -172,15 +172,15 @@ function renderEsq(){let h='',add='',grp='';
   return '<div class="itw'+(!(i.falhasSeguidas>0)&&{below:' in',warn:' warn',hot:' hot'}[st.k]||'')+(i.asin===S.sel?' sel':'')+'"'+(S.edit?' draggable="true" data-dr="'+esc(i.asin)+'"':'')+'><button type="button" class="item" data-asin="'+esc(i.asin)+'" aria-pressed="'+(i.asin===S.sel)+'">'+foto(i)
    +'<span class="ti"><b>'+i.num+'. '+esc(i.titulo||i.asin)+'</b></span><span class="pr num">'+(a.atual!=null?brl(a.atual):'—')+'</span>'
    +'<span class="stt">'+pill(st)+tags+'</span>'+degraus(i.mini,80,26,cor)+'</button>'+alv+'</div>'};
- const selI=S.itens.find(x=>x.asin===S.sel),vistos=new Set();
+ const vistos=new Set();
  for(const i of vis){
   if(i.grupoId==null||!gnome(i.grupoId)){h+=card(i);continue}
   if(vistos.has(i.grupoId))continue;vistos.add(i.grupoId);
   const gid=i.grupoId,todos=S.itens.filter(x=>x.grupoId===gid),aqui=vis.filter(x=>x.grupoId===gid);
   const precos=todos.map(preco).filter(v=>v!=null),men=precos.length?Math.min(...precos):null,rep=todos.slice().sort((x,y)=>(preco(x)??1e9)-(preco(y)??1e9))[0];
-  const aberto=S.gsel===gid||F.gr===String(gid)||(selI&&selI.grupoId===gid&&S.gsel==null);
-  h+='<div class="itw grp'+(S.gsel===gid?' sel':'')+'" data-dg="'+gid+'"><button type="button" class="item" data-gid="'+gid+'" aria-pressed="'+(S.gsel===gid)+'">'+foto(rep)
-   +'<span class="ti"><b>▦ '+esc(gnome(gid))+'</b></span><span class="pr num">'+(men!=null?brl(men):'—')+'</span><span class="stt"><span class="pill">'+todos.length+' itens</span>'+(men!=null?'<span class="mut">menor preço</span>':'')+'</span></button></div>';
+  const buscando=!!F.q.trim(),aberto=S.abertos.has(gid)||F.gr===String(gid)||(buscando&&aqui.length>0);
+  h+='<div class="itw grp'+(S.gsel===gid?' sel':'')+'" data-dg="'+gid+'"><button type="button" class="item" data-gid="'+gid+'" aria-pressed="'+(S.gsel===gid)+'" aria-expanded="'+aberto+'">'+foto(rep)
+   +'<span class="ti"><b>'+(aberto?'▾':'▸')+' ▦ '+esc(gnome(gid))+'</b></span><span class="pr num">'+(men!=null?brl(men):'—')+'</span><span class="stt"><span class="pill">'+(buscando&&aqui.length!==todos.length?aqui.length+' de '+todos.length:todos.length)+' itens</span>'+(men!=null?'<span class="mut">menor preço</span>':'')+'</span></button></div>';
   if(aberto)h+='<div style="margin-left:18px;display:grid;gap:8px">'+aqui.map(card).join('')+'</div>'}
  h+='</div>';
  if(!S.itens.length)h+='<div class="cd vazio">Nenhum item rastreado. Cole um link da Amazon acima ou no bot do Telegram.</div>';
@@ -195,7 +195,7 @@ function renderEsq(){let h='',add='',grp='';
  $('#esq').querySelectorAll('.item').forEach(e=>e.onclick=()=>selecionar(e.dataset.asin));
  if(S.edit)ligarDrag();
  document.querySelectorAll('#pn-grp [data-g]').forEach(b=>b.onclick=()=>{if(b.dataset.g!=='none'){setPn(null);abrirGrupo(Number(b.dataset.g))}});
- $('#lst').querySelectorAll('[data-gid]').forEach(b=>b.onclick=()=>abrirGrupo(Number(b.dataset.gid)));
+ $('#lst').querySelectorAll('[data-gid]').forEach(b=>b.onclick=()=>{const g=Number(b.dataset.gid);if(b.getAttribute('aria-expanded')==='true'&&S.abertos.has(g)){S.abertos.delete(g);if(S.gsel===g){S.gsel=null;detalhe()}renderEsq()}else abrirGrupo(g)});
  $('#lst').querySelectorAll('.alv').forEach(c=>{const asin=c.dataset.asin,inp=c.querySelector('input'),
   set=(b,val,msg)=>rodar(b,async()=>{await api('PUT','/api/itens/'+asin+'/alvo',{linha:'amazon',valor:val});aviso(msg);await carregar()});
   c.querySelector('[data-cs]').onclick=e=>{const t=inp.value.trim();if(!t)return aviso('Digite um valor.',1);set(e.target,t,'Alvo salvo.')};
@@ -336,7 +336,7 @@ function ligarDrag(){const alvo=(el,fn)=>{el.ondragover=e=>{if(!S.drag)return;e.
  $('#lst').querySelectorAll('[data-dg]').forEach(b=>alvo(b,src=>{const it=S.itens.find(i=>i.asin===src);if(it&&it.grupoId!==Number(b.dataset.dg))rodar(null,()=>colocar(src,Number(b.dataset.dg),'Item colocado no grupo.'))}));
  document.querySelectorAll('#pn-grp [data-g]').forEach(b=>alvo(b,src=>{const g=b.dataset.g;if(g==='none'){const it=S.itens.find(i=>i.asin===src);if(it&&it.grupoId!=null)rodar(null,()=>colocar(src,null,'Item fora de grupos.'))}else rodar(null,()=>colocar(src,Number(g),'Item colocado no grupo.'))}))}
 const GC=['#2a78d6','#eb6834','#1baf7a','#8a5cd6','#c9a100','#d6407a','#5c6b78','#0aa5b5'];
-function abrirGrupo(id){S.gsel=id;S.gdet=null;S.hover=null;renderEsq();detalhe();if(innerWidth<=900)$('#dir').scrollIntoView({behavior:'smooth',block:'start'})}
+function abrirGrupo(id){S.abertos.add(id);S.gsel=id;S.gdet=null;S.hover=null;renderEsq();detalhe();if(innerWidth<=900)$('#dir').scrollIntoView({behavior:'smooth',block:'start'})}
 function grupoGrafico(g){const host=$('#gchart');if(!host)return;const W=host.clientWidth||840,H=270,L=62,R=14,T=14,B=28,x0=Date.parse(g.desde),x1=Date.now();
  const vals=g.itens.flatMap(i=>i.serie.map(p=>p.v));if(!vals.length){host.innerHTML='<p class="mut">Sem coletas neste período.</p>';return}
  let y0=Math.min(...vals),y1=Math.max(...vals);const sp=Math.max(y1-y0,y1*.05);y0-=sp*.12;y1+=sp*.12;
