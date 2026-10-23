@@ -1,6 +1,7 @@
 import { Actions, MAX_BATCH, RESOLVE_ERRORS, extractLinks, isMuted, muteKey } from "./actions.ts";
 import type { AsinResult } from "./amazon/asin.ts";
 import { productUrl } from "./amazon/fetch.ts";
+import { IMAGE_HOST_RE } from "./amazon/parse.ts";
 import type { CollectOutcome } from "./collector.ts";
 import type { Product, Store } from "./db.ts";
 import * as fmt from "./format.ts";
@@ -12,7 +13,7 @@ import { buildView } from "./view.ts";
 
 export interface BotDeps {
   store: Store;
-  send: (html: string, keyboard?: Button[][]) => Promise<void>;
+  send: (html: string, keyboard?: Button[][], photo?: string | null) => Promise<void>;
   collect: (p: Product) => Promise<CollectOutcome>;
   resolve: (text: string) => Promise<AsinResult>;
   now: () => Date;
@@ -21,6 +22,9 @@ export interface BotDeps {
 const AWAITING = "awaiting_target";
 
 export { isMuted, muteKey };
+
+/** Foto do produto só se vier de um host de imagens da Amazon. */
+export const photoOf = (p: Product): string | null => (p.imagem && IMAGE_HOST_RE.test(p.imagem) ? p.imagem : null);
 
 export const alertKeyboard = (p: Product): Button[][] => [
   [
@@ -87,8 +91,11 @@ export class Bot {
       case "/ajuda":
         return this.d.send(fmt.HELP);
       case "/lista":
-        for (const page of fmt.list(this.store.list().map((p) => this.view(p)))) await this.d.send(page);
-        return;
+        return this.d.send(fmt.LISTA_AVISO);
+      case "/item": {
+        const p = await needP();
+        return p ? this.d.send(fmt.card(this.view(p)), alertKeyboard(p), photoOf(p)) : undefined;
+      }
       case "/historico": {
         const p = await needP();
         return p ? this.d.send(fmt.history(this.view(p))) : undefined;
@@ -143,7 +150,7 @@ export class Bot {
       return this.d.send(`Não consegui ler a página agora${r.detalhe ? ` (${r.detalhe})` : ""}. Nada foi cadastrado. Tente de novo em alguns minutos.`);
     }
     const view = this.view(r.product);
-    await this.d.send(fmt.card(view));
+    await this.d.send(fmt.card(view), undefined, photoOf(r.product));
     return this.askTarget(r.product, view.linhas.amazon.atual);
   }
 
@@ -226,7 +233,10 @@ export class Bot {
         await this.d.send(`Linha <b>${nome}</b> ligada para #${this.store.numberOf(p.id)}. Lendo agora (2 requisições por rodada a partir daqui)…`);
         const o = await this.act.collectNow(p);
         if (!o.ok) return this.d.send(o.detalhe ? `Não consegui ler agora (${o.detalhe}). A linha será coletada na próxima rodada.` : "Não consegui ler agora. A linha será coletada na próxima rodada.");
-        return this.d.send(fmt.card(this.view(this.store.getById(p.id)!)));
+        {
+          const fresh = this.store.getById(p.id)!;
+          return this.d.send(fmt.card(this.view(fresh)), undefined, photoOf(fresh));
+        }
       }
       default:
         return undefined;

@@ -1,5 +1,5 @@
 import { recovered, shouldAlertFailures } from "./alerts.ts";
-import { alertKeyboard, isMuted } from "./bot.ts";
+import { alertKeyboard, isMuted, photoOf } from "./bot.ts";
 import type { CollectOutcome } from "./collector.ts";
 import type { Product, Store } from "./db.ts";
 import * as fmt from "./format.ts";
@@ -9,7 +9,7 @@ import { buildView } from "./view.ts";
 export interface CycleDeps {
   store: Store;
   collect: (p: Product) => Promise<CollectOutcome>;
-  send: (html: string, keyboard?: Button[][]) => Promise<void>;
+  send: (html: string, keyboard?: Button[][], photo?: string | null) => Promise<void>;
   now: () => Date;
   sleep: (ms: number) => Promise<void>;
   /** Pausa entre produtos. */
@@ -29,11 +29,11 @@ const FAILS_SINCE = "cycle_fails_since";
 const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
 /** Alerta importa: tenta de novo antes de desistir, porque o estado de "já avisado" já foi gravado. */
-async function sendWithRetry(d: CycleDeps, html: string, kb?: Button[][]): Promise<boolean> {
+async function sendWithRetry(d: CycleDeps, html: string, kb?: Button[][], photo?: string | null): Promise<boolean> {
   for (const wait of [0, 1500, 5000]) {
     if (wait) await d.sleep(wait);
     try {
-      await d.send(html, kb);
+      await d.send(html, kb, photo);
       return true;
     } catch (e) {
       d.log(`falha ao enviar mensagem: ${(e as Error).message}`);
@@ -71,7 +71,7 @@ export async function runCycle(d: CycleDeps): Promise<CycleResult> {
     for (const item of outcome.alertas) {
       if (isMuted(d.store, item.product.id, d.now())) continue;
       const fresh = d.store.getById(item.product.id) ?? item.product;
-      if (await sendWithRetry(d, fmt.alert(item, buildView(d.store, fresh, d.now())), alertKeyboard(fresh))) res.alertas++;
+      if (await sendWithRetry(d, fmt.alert(item, buildView(d.store, fresh, d.now())), alertKeyboard(fresh), photoOf(fresh))) res.alertas++;
     }
   }
 

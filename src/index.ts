@@ -31,7 +31,7 @@ const lock = createLock();
 const ac = new AbortController();
 const HEARTBEAT = process.env["HEARTBEAT_FILE"] ?? "/tmp/heartbeat";
 
-const send = (html: string, kb?: Parameters<Telegram["sendMessage"]>[2]) => tg.sendMessage(cfg.chatId, html, kb);
+const send = (html: string, kb?: Parameters<Telegram["sendMessage"]>[2], photo?: string | null) => tg.sendMessage(cfg.chatId, html, kb, photo);
 const delay = () => jitterMs(cfg.reqMinMs, cfg.reqMaxMs);
 // Uma requisição à Amazon por vez, venha ela do agendador ou de um link colado no chat.
 const collect = (p: Parameters<typeof collectOne>[1]) => lock(() => collectOne(store, p, realDeps(delay)));

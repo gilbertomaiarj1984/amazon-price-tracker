@@ -53,6 +53,19 @@ describe("Telegram", () => {
     expect(seen!.url).toContain("/botSEGREDO/getUpdates");
     expect(seen!.body).toMatchObject({ offset: 5, timeout: 1 });
   });
+  test("com foto usa sendPhoto; se a foto falhar, cai no texto", async () => {
+    const methods: string[] = [];
+    const tg = new Telegram("SEGREDO", async (url) => {
+      const m = url.split("/").pop()!;
+      methods.push(m);
+      return m === "sendPhoto" ? new Response(JSON.stringify({ ok: false, description: "bad url" }), { status: 400 }) : new Response(JSON.stringify({ ok: true, result: {} }));
+    });
+    await tg.sendMessage(1, "oi", undefined, "https://m.media-amazon.com/images/I/a.jpg");
+    expect(methods).toEqual(["sendPhoto", "sendMessage"]);
+    methods.length = 0;
+    await tg.sendMessage(1, "oi");
+    expect(methods).toEqual(["sendMessage"]);
+  });
   test("erro da API não vaza o token", async () => {
     const tg = new Telegram("SEGREDO", async () => new Response(JSON.stringify({ ok: false, description: "Unauthorized" }), { status: 401 }));
     const err = await tg.sendMessage(1, "oi").catch((e: Error) => e);

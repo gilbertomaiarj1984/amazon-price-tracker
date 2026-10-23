@@ -6,6 +6,8 @@ export interface Update {
   callback_query?: { id: string; data?: string; message?: { chat: { id: number } } };
 }
 
+const CAPTION_MAX = 1024;
+
 type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
 
 /** Cliente mínimo da Bot API. O token vai na URL, então os erros nunca repetem a URL. */
@@ -42,7 +44,22 @@ export class Telegram {
     );
   }
 
-  async sendMessage(chatId: number, html: string, keyboard?: Button[][]): Promise<void> {
+  /** Com `photo`, manda a foto com o texto de legenda (limite de 1024); se a foto falhar, cai no texto puro. */
+  async sendMessage(chatId: number, html: string, keyboard?: Button[][], photo?: string | null): Promise<void> {
+    if (photo && html.length <= CAPTION_MAX) {
+      try {
+        await this.call("sendPhoto", {
+          chat_id: chatId,
+          photo,
+          caption: html,
+          parse_mode: "HTML",
+          ...(keyboard ? { reply_markup: { inline_keyboard: keyboard } } : {}),
+        });
+        return;
+      } catch {
+        // Telegram não conseguiu baixar a imagem: o card sai sem foto.
+      }
+    }
     await this.call("sendMessage", {
       chat_id: chatId,
       text: html,

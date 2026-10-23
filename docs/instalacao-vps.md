@@ -105,7 +105,7 @@ docker ps --format 'table {{.Names}}\t{{.Status}}'
 
 ## Passo 6. Primeiro uso
 
-No chat com o bot, cole o link de um produto da amazon.com.br, escolha o alvo (−5%, −10%, −15% ou um valor) e pronto. `/ajuda` lista os comandos: `/lista`, `/historico N`, `/linhas N`, `/alvo N [linha] valor`, `/pausar N`, `/remover N`.
+No chat com o bot, cole o link de um produto da amazon.com.br, escolha o alvo (−5%, −10%, −15% ou um valor) e pronto. `/ajuda` lista os comandos: `/item N`, `/historico N`, `/linhas N`, `/alvo N [linha] valor`, `/pausar N`, `/remover N`.
 
 ## Problemas comuns
 

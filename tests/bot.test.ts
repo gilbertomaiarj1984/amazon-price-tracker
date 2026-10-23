@@ -122,25 +122,24 @@ describe("comandos", () => {
     sent.length = 0;
   });
 
-  test("/lista", async () => {
+  test("/lista não despeja a lista: aponta para /item N", async () => {
     await bot.handleText("/lista");
-    expect(last().html).toContain("Itens rastreados (1)");
-    expect(last().html).toContain("Amazon R$ 20,10");
-    expect(last().html).toContain("sem alvo");
+    expect(sent).toHaveLength(1);
+    expect(last().html).toContain("/item N");
   });
-  test("/lista com 70 itens divide em mensagens abaixo do limite do Telegram", async () => {
-    for (let i = 2; i <= 70; i++) store.addProduct(`B${String(i).padStart(9, "0")}`, `Produto com um título bem longo número ${i} `.repeat(3), new Date().toISOString());
-    await bot.handleText("/lista");
-    expect(sent.length).toBeGreaterThan(1);
-    for (const m of sent) expect(m.html.length).toBeLessThan(4096);
-    const all = texts();
-    expect(all).toContain("Itens rastreados (70)");
-    for (const n of [1, 35, 70]) expect(all).toContain(`<b>#${n}</b>`);
-  });
-  test("/lista vazia", async () => {
-    store.remove(1);
-    await bot.handleText("/lista");
-    expect(last().html).toContain("Nenhum item rastreado");
+  test("/item N manda o card com foto e botões; sem foto válida, sem foto", async () => {
+    const photos: (string | null | undefined)[] = [];
+    const b = new Bot({ store, send: async (html, kb, photo) => void (sent.push({ html, kb }), photos.push(photo)), collect: async () => { throw new Error("x"); }, resolve: async () => { throw new Error("x"); }, now: () => new Date(net.clock.t) });
+    store.setImagem(1, "https://m.media-amazon.com/images/I/abc.jpg");
+    await b.handleText("/item 1");
+    expect(last().html).toContain("Heinz Ketchup");
+    expect(cbs(last())).toContain("h:1");
+    expect(photos.at(-1)).toBe("https://m.media-amazon.com/images/I/abc.jpg");
+    store.setImagem(1, "https://evil.example/x.jpg");
+    await b.handleText("/item 1");
+    expect(photos.at(-1) ?? null).toBeNull();
+    await b.handleText("/item 99");
+    expect(last().html).toContain("Não achei");
   });
   test("/historico", async () => {
     await bot.handleText("/historico 1");
@@ -199,7 +198,7 @@ describe("comandos", () => {
     await bot.handleText("oi");
     expect(last().html).toContain("Não entendi");
     await bot.handleText("/lista@MeuBot");
-    expect(last().html).toContain("Itens rastreados");
+    expect(last().html).toContain("/item N");
   });
   test("botão de item que sumiu", async () => {
     await bot.handleCallback("h:99");
