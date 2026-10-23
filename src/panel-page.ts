@@ -91,14 +91,16 @@ const MOTIVOS={captcha:'captcha da Amazon',http_503:'Amazon respondeu 503',http_
 const motivo=m=>MOTIVOS[m]||m||'motivo desconhecido';
 /* nunca = ainda sem leitura; erro = leitura falhou e nada foi gravado; ok = leu (a Amazon pode não ter oferta) */
 const lido=i=>i.linhas.amazon.coletas||(i.ultimaColeta&&i.ultimaColeta.ok)?'ok':i.ultimaColeta?'erro':'nunca';
-function status(i){const a=i.linhas.amazon;
+/* preço exibido: o da Amazon, ou o do melhor terceiro quando ela não vende */
+const ap=i=>{const a=i.linhas.amazon,t=i.linhas.terceiros;return a.atual!=null?a.atual:(t.automatico?t.atual:null)};
+function status(i){const a=i.linhas.amazon,v=ap(i);
  if(i.pausado)return{k:'paused',t:'Pausado'};
  if(!a.coletas&&!i.ultimaColeta)return{k:'',t:'Aguardando 1ª coleta'};
  if(!a.coletas&&!i.ultimaColeta.ok)return{k:'gap',t:'Erro na coleta ('+motivo(i.ultimaColeta.motivo)+')'};
- if(a.atual==null)return{k:'gap',t:'Amazon sem oferta (confirmado)'};
- if(a.alvo==null)return{k:'',t:'Sem alvo'};
- if(a.atual<=a.alvo)return{k:'below',t:'▼ Dentro do alvo'};
- const p=(a.atual-a.alvo)/a.alvo*100;return{k:p>LIMITE_LARANJA?'hot':'warn',t:'▲ '+p.toFixed(1).replace('.',',')+'% acima do alvo'}}
+ if(v==null)return{k:'gap',t:'Amazon sem oferta (confirmado)'};
+ if(a.alvo==null)return{k:'',t:a.atual==null?'Amazon sem oferta · só terceiro':'Sem alvo'};
+ if(v<=a.alvo)return{k:'below',t:'▼ Dentro do alvo'};
+ const p=(v-a.alvo)/a.alvo*100;return{k:p>LIMITE_LARANJA?'hot':'warn',t:'▲ '+p.toFixed(1).replace('.',',')+'% acima do alvo'}}
 const LIMITE_LARANJA=20;/* % acima do alvo, (atual − alvo) / alvo: até aqui laranja, acima disso vermelho */
 const pill=s=>'<span class="pill '+s.k+'">'+esc(s.t)+'</span>';
 function foto(i,cls){return '<div class="foto">'+(i.imagem?'<img src="'+esc(i.imagem)+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.textContent=\\'🛒\\'">':'<span>🛒</span>')+'</div>'}
@@ -121,7 +123,7 @@ let F=Object.assign({},F0);try{Object.assign(F,JSON.parse(localStorage.getItem(F
 const salvaF=()=>{try{localStorage.setItem(FK,JSON.stringify(F))}catch(e){}};
 const sem=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const nv=t=>{const n=Number(String(t).replace(/[^0-9,.]/g,'').replace(',','.'));return t===''||!isFinite(n)?null:n};
-function dist(i){const a=i.linhas.amazon;return a.atual!=null&&a.alvo!=null?(a.atual-a.alvo)/a.alvo*100:null}
+function dist(i){const a=i.linhas.amazon,v=ap(i);return v!=null&&a.alvo!=null?(v-a.alvo)/a.alvo*100:null}
 function queda(i){const m=i.mini;return m.length>1&&m[0].v?(m[m.length-1].v-m[0].v)/m[0].v*100:null}
 function ultima(i){const m=i.mini;return m.length?Date.parse(m[m.length-1].t):null}
 function preco(i){const a=i.linhas.amazon;if(a.atual!=null)return a.atual;const o=['terceiros','usado'].map(k=>i.linhas[k].atual).filter(v=>v!=null);return o.length?Math.min(...o):null}
@@ -130,10 +132,10 @@ const gnome=id=>(S.grupos.find(g=>g.id===id)||{}).nome;
 const FILTROS={'':'Todos os status',dentro:'Dentro do alvo',acima:'Acima do alvo',semalvo:'Sem alvo',pausado:'Pausados',falha:'Com falha na coleta',semoferta:'Amazon sem oferta',semcoleta:'Sem coleta ainda'};
 function passa(i){const a=i.linhas.amazon,t=sem(i.titulo)+' '+i.asin.toLowerCase()+' '+sem(i.grupoId!=null?gnome(i.grupoId):'');
  if(F.q&&!F.q.split(/\\s+/).every(w=>t.includes(sem(w))))return false;
- switch(F.st){case 'dentro':if(!(a.atual!=null&&a.alvo!=null&&a.atual<=a.alvo))return false;break;
-  case 'acima':if(!(a.atual!=null&&a.alvo!=null&&a.atual>a.alvo))return false;break;
+ switch(F.st){case 'dentro':if(!(ap(i)!=null&&a.alvo!=null&&ap(i)<=a.alvo))return false;break;
+  case 'acima':if(!(ap(i)!=null&&a.alvo!=null&&ap(i)>a.alvo))return false;break;
   case 'semalvo':if(a.alvo!=null)return false;break;case 'pausado':if(!i.pausado)return false;break;
-  case 'falha':if(!(i.falhasSeguidas>0))return false;break;case 'semoferta':if(!(lido(i)==='ok'&&(a.atual==null||a.terceiro)))return false;break;
+  case 'falha':if(!(i.falhasSeguidas>0))return false;break;case 'semoferta':if(!(lido(i)==='ok'&&a.atual==null))return false;break;
   case 'semcoleta':if(lido(i)==='ok')return false;break}
  if(F.gr==='none'?i.grupoId!=null:F.gr&&String(i.grupoId)!==F.gr)return false;
  if(F.ln&&!i.linhas[F.ln].ligada)return false;
@@ -173,12 +175,12 @@ function renderEsq(){let h='',add='',grp='';
  if(S.edit)grp+='<div class="gs"><b style="font-size:14px">Grupos</b> <span class="mut">Arraste um item sobre outro item ou sobre um grupo para agrupar.</span><div class="chips">'+S.grupos.map(g=>'<button type="button" class="chip'+(S.gsel===g.id?' on':'')+'" data-g="'+g.id+'">▦ '+esc(g.nome)+' ('+S.itens.filter(i=>i.grupoId===g.id).length+')</button>').join('')+'<button type="button" class="chip" data-g="none" title="Solte aqui para tirar o item do grupo">✕ Sem grupo</button></div></div>';
  h='<div class="lista">';const vis=visiveis();
  const card=i=>{const a=i.linhas.amazon,st=status(i);
-  const tags=(a.terceiro?'<span class="pill" title="A Amazon não vende; este é o melhor terceiro">Terceiro: '+esc(a.vendedor||'?')+'</span>':'')+(i.silenciadoAte?'<span class="pill">alertas silenciados</span>':'')+(i.falhasSeguidas>0?'<span class="pill fail">falha na coleta</span>':'')+'';
+  const tags=(i.linhas.terceiros.automatico?'<span class="pill" title="A Amazon não vende; este é o melhor terceiro">Terceiro: '+esc(i.linhas.terceiros.vendedor||'?')+'</span>':'')+(i.silenciadoAte?'<span class="pill">alertas silenciados</span>':'')+(i.falhasSeguidas>0?'<span class="pill fail">falha na coleta</span>':'')+'';
   const cor=a.coletas?COR.amazon:COR.terceiros;
-  const al=a.alvo,chips=a.atual!=null?[5,10,15].map(p=>{const v=Math.round(a.atual*(1-p/100));return '<button type="button" class="btn sm" data-cv="'+v+'" title="'+brl(v)+'">−'+p+'%</button>'}).join(''):'';
+  const al=a.alvo,chips=ap(i)!=null?[5,10,15].map(p=>{const v=Math.round(ap(i)*(1-p/100));return '<button type="button" class="btn sm" data-cv="'+v+'" title="'+brl(v)+'">−'+p+'%</button>'}).join(''):'';
   const alv=S.edit?'<div class="alv" data-asin="'+esc(i.asin)+'"><span class="mut">Alvo</span><input type="text" class="val" inputmode="decimal" placeholder="ex.: 449" value="'+(al!=null?String(al).replace('.',','):'')+'" aria-label="Alvo da Amazon do item '+i.num+'"><button type="button" class="btn sm pri" data-cs="1">Definir</button>'+chips+(al!=null?'<button type="button" class="btn sm" data-cx="1" title="Remover alvo">×</button>':'')+'</div>':'';
   return '<div class="itw'+(!(i.falhasSeguidas>0)&&{below:' in',warn:' warn',hot:' hot'}[st.k]||'')+(i.asin===S.sel?' sel':'')+'"'+(S.edit?' draggable="true" data-dr="'+esc(i.asin)+'"':'')+'><button type="button" class="item" data-asin="'+esc(i.asin)+'" aria-pressed="'+(i.asin===S.sel)+'">'+foto(i)
-   +'<span class="ti"><b>'+esc(i.titulo||i.asin)+'</b></span><span class="pr num">'+(a.atual!=null?brl(a.atual):'—')+'</span>'
+   +'<span class="ti"><b>'+esc(i.titulo||i.asin)+'</b></span><span class="pr num">'+(ap(i)!=null?brl(ap(i)):'—')+'</span>'
    +'<span class="stt">'+pill(st)+tags+'</span>'+degraus(i.mini,80,26,cor)+'</button>'+alv+'</div>'};
  const vistos=new Set();
  for(const i of vis){
@@ -236,10 +238,11 @@ function bindPickers(root){root.querySelectorAll('[data-picker]').forEach(c=>{co
  c.querySelector('[data-skip]').onclick=()=>{S.ult='';renderEsq()}})}
 
 /* gráfico em degraus: linhas, faixas sem Amazon, alvos tracejados e cursor com os valores de todas as linhas */
-function tempos(d){const s=new Set();for(const k of LK)if(d.linhas[k].ligada)for(const p of d.series[k])s.add(p.t);return [...s].sort()}
+const ativa=l=>l.ligada||!!l.automatico;
+function tempos(d){const s=new Set();for(const k of LK)if(ativa(d.linhas[k]))for(const p of d.series[k])s.add(p.t);return [...s].sort()}
 function valorEm(d,k,t){const p=d.series[k].find(x=>x.t===t);return p?p.v:null}
 function grafico(d){const host=$('#chart');if(!host)return;const W=host.clientWidth||840,H=290,L=62,R=14,T=14,B=28,x0=Date.parse(d.desde),x1=Date.now();
- const ls=LK.filter(k=>d.linhas[k].ligada);
+ const ls=LK.filter(k=>ativa(d.linhas[k]));
  let vals=ls.flatMap(k=>d.series[k].map(p=>p.v));
  if(!vals.length){host.innerHTML='<p class="mut">Sem coletas neste período.</p>';return}
  for(const k of ls)if(d.linhas[k].alvo!=null)vals.push(d.linhas[k].alvo);
@@ -272,7 +275,7 @@ function grafico(d){const host=$('#chart');if(!host)return;const W=host.clientWi
  hit.onpointerleave=e=>{if(e.pointerType==='mouse'){S.hover=null;hover()}};
  host.onkeydown=e=>{if(!ts.length)return;if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();const c=S.hover==null?ts.length-1:S.hover;S.hover=Math.max(0,Math.min(ts.length-1,c+(e.key==='ArrowLeft'?-1:1)));hover()}else if(e.key==='Escape'){S.hover=null;hover()}}}
 
-function tabelaColetas(d){const ts=tempos(d).slice(-24).reverse(),ls=LK.filter(k=>d.linhas[k].ligada);
+function tabelaColetas(d){const ts=tempos(d).slice(-24).reverse(),ls=LK.filter(k=>ativa(d.linhas[k]));
  if(!ts.length)return '<p class="mut">Sem coletas neste período.</p>';
  return '<div class="tw"><table><tr><th>Coleta</th>'+ls.map(k=>'<th class="n">'+NOME[k]+'</th>').join('')+'</tr>'+ts.map(t=>'<tr><td class="num">'+dt(t)+'</td>'+ls.map(k=>{const v=valorEm(d,k,t);return '<td class="n num">'+(v==null?'<span class="mut">sem oferta</span>':brl(v))+'</td>'}).join('')+'</tr>').join('')+'</table></div><div class="mut" style="margin-top:6px">Últimas 24 coletas do período.</div>'}
 
@@ -285,15 +288,15 @@ function renderDir(){if(S.gsel!=null)return renderGrupo();const d=S.det,it=S.ite
  h+='<div class="act">'+(url?'<a class="btn sm" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Abrir na Amazon</a>':'')+(S.edit?'<button class="btn sm" data-q="1"'+(libera(d)?' disabled':'')+'>'+(libera(d)?'Consultar em '+libera(d)+' min':'Consultar agora')+'</button><button class="btn sm" data-p="1">'+(d.pausado?'Retomar':'Pausar')+'</button><button class="btn sm" data-s="1">'+(d.silenciadoAte?'Reativar alertas':'Silenciar 24 h')+'</button><button class="btn sm bad" data-r="1">Remover</button>':'')+'</div></div>';
  h+='<div class="row" style="margin-top:12px"><span class="mut">Grupo</span>'+(S.edit?'<select id="dg" aria-label="Grupo do item"><option value="">Sem grupo</option>'+S.grupos.map(g=>'<option value="'+g.id+'"'+(g.id===it.grupoId?' selected':'')+'>'+esc(g.nome)+'</option>').join('')+'<option value="new">+ Novo grupo…</option></select>':'<b>'+esc(gnome(it.grupoId)||'—')+'</b>')+(it.grupoId!=null?'<button type="button" class="btn sm" data-vg="1">Ver grupo</button>':'')+'</div>';
  h+='<div class="tw"><table><tr><th>Linha de preço</th><th class="n">Agora</th><th class="n">Alvo</th><th class="n">Mín 30 d</th><th class="n">Máx 30 d</th><th class="n">Variação</th>'+(S.edit?'<th>Coleta</th>':'')+'</tr>';
- LK.forEach((k,idx)=>{const l=L[k],on=l.ligada;
+ LK.forEach((k,idx)=>{const l=L[k],on=ativa(l);
   h+='<tr data-k="'+k+'"><td><i class="key" style="--c:'+COR[k]+'"></i><b style="font-weight:600">'+NOME[k]+'</b>'+(idx===0?' <span class="pill">principal</span>':'')+'</td>'
-   +'<td class="n num">'+(on?(l.atual!=null?brl(l.atual)+(l.terceiro?'<div class="mut">Terceiro · '+esc(l.vendedor||'?')+(l.terceiro.envio==='amazon'?' · enviado pela Amazon':l.terceiro.envio==='terceiro'?' · enviado pelo vendedor':'')+'</div>':''):idx===0&&lido(it)==='nunca'?'<span class="mut">aguardando</span>':idx===0&&lido(it)==='erro'?'<span class="mut">erro na coleta</span>':'<span class="mut">sem oferta</span>'):'<span class="mut">—</span>')+'</td>'
-   +'<td class="n">'+(S.edit?'<input type="text" class="val" inputmode="decimal" data-alvo="'+k+'" value="'+(l.alvo!=null?String(l.alvo).replace('.',','):'')+'" placeholder="sem alvo" aria-label="Alvo da linha '+NOME[k]+'"'+(on?'':' disabled')+'>':(l.alvo!=null?brl(l.alvo):'—'))+'</td>'
+   +'<td class="n num">'+(on?(l.atual!=null?brl(l.atual)+(l.automatico?'<div class="mut">'+(l.ligada?'':'Automático (Amazon sem oferta) · ')+esc(l.vendedor||'?')+(l.automatico.envio==='amazon'?' · enviado pela Amazon':l.automatico.envio==='terceiro'?' · enviado pelo vendedor':'')+'</div>':''):idx===0&&lido(it)==='nunca'?'<span class="mut">aguardando</span>':idx===0&&lido(it)==='erro'?'<span class="mut">erro na coleta</span>':'<span class="mut">sem oferta</span>'):'<span class="mut">—</span>')+'</td>'
+   +'<td class="n">'+(S.edit?'<input type="text" class="val" inputmode="decimal" data-alvo="'+k+'" value="'+(l.alvo!=null?String(l.alvo).replace('.',','):'')+'" placeholder="sem alvo" aria-label="Alvo da linha '+NOME[k]+'"'+(l.ligada?'':' disabled')+'>':(l.alvo!=null?brl(l.alvo):'—'))+'</td>'
    +'<td class="n num">'+(on?brl(l.min):'—')+'</td><td class="n num">'+(on?brl(l.max):'—')+'</td><td class="n num">'+(on&&l.variacao!=null?pct(l.variacao):'—')+'</td>'
-   +(S.edit?'<td>'+(idx===0?'<span class="mut">sempre</span>':'<label><input type="checkbox" data-linha="'+k+'" '+(on?'checked':'')+'> coletar</label>')+'</td>':'')+'</tr>'});
+   +(S.edit?'<td>'+(idx===0?'<span class="mut">sempre</span>':'<label><input type="checkbox" data-linha="'+k+'" '+(l.ligada?'checked':'')+'> coletar</label>')+'</td>':'')+'</tr>'});
  h+='</table></div>'+(S.edit?'<div class="mut" style="margin-top:6px">Aviso no Telegram quando o preço ficar igual ou abaixo do alvo. Deixe o campo vazio para remover o alvo. Ligar Terceiros ou Usado usa 2 requisições por rodada.</div>':'');
  h+='<div class="bar"><div class="seg">'+[7,14,30].map(n=>'<button type="button" data-n="'+n+'" aria-pressed="'+(n===S.dias)+'">'+n+' dias</button>').join('')+'</div><div class="seg"><button type="button" data-vz="grafico" aria-pressed="'+(S.visao==='grafico')+'">Gráfico</button><button type="button" data-vz="tabela" aria-pressed="'+(S.visao==='tabela')+'">Tabela</button></div></div>';
- if(S.visao==='grafico')h+='<div class="chart" id="chart" tabindex="0"></div><div class="leg">'+LK.filter(k=>L[k].ligada).map(k=>'<span><i class="key" style="--c:'+COR[k]+'"></i>'+NOME[k]+'</span>').join('')+'<span><i class="g"></i>Amazon não vendeu</span><span><i class="key" style="--c:var(--fg2);border-top-style:dashed"></i>Alvo</span></div>';
+ if(S.visao==='grafico')h+='<div class="chart" id="chart" tabindex="0"></div><div class="leg">'+LK.filter(k=>ativa(L[k])).map(k=>'<span><i class="key" style="--c:'+COR[k]+'"></i>'+NOME[k]+'</span>').join('')+'<span><i class="g"></i>Amazon não vendeu</span><span><i class="key" style="--c:var(--fg2);border-top-style:dashed"></i>Alvo</span></div>';
  else h+=tabelaColetas(d);
  h+='<div class="sh">Ofertas na última coleta <span class="mut">'+(d.ofertasEm?ago(d.ofertasEm):'')+'</span></div>';
  const best=melhores(d.ofertas);
