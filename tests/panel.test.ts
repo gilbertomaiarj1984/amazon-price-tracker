@@ -464,3 +464,11 @@ test("lista com rolagem própria e detalhe fixo no desktop, empilhado no celular
   const mobile = html.split("@media(max-width:900px)")[1]!;
   expect(mobile).not.toContain("sticky");
 });
+
+test("topo do painel mostra o número do último PR e não tem título", async () => {
+  const { ULTIMO_PR } = await import("../src/versao.ts");
+  expect(Number.isInteger(ULTIMO_PR) && ULTIMO_PR > 0).toBe(true);
+  const html = await (await get("/")).text();
+  expect(html).toContain(`PR #${ULTIMO_PR}`);
+  expect(html).not.toContain("<h1>");
+});
