@@ -25,6 +25,7 @@ h1{font-size:22px;margin:0 0 14px;letter-spacing:-.01em}
 .pill.below{background:var(--goodbg);color:var(--good)}.pill.warn{background:var(--larbg);color:var(--lar)}.pill.hot{background:var(--badbg);color:var(--bad)}.pill.gap{background:var(--warnbg);color:var(--warn)}.pill.paused{color:var(--mut)}.pill.fail{background:var(--badbg);color:var(--bad)}
 .lista{display:grid;gap:8px}
 .itw{border:1px solid var(--bd);background:var(--sf);border-radius:12px;overflow:hidden}.itw:hover{background:var(--sf2)}.itw.grp,.itw.grp:hover{background:var(--accsoft);border:2px solid var(--acc);border-left-width:8px;box-shadow:5px 5px 0 -1px var(--accsoft),5px 5px 0 0 var(--acc)}.itw.grp .ti b{font-size:15px;font-weight:700;color:var(--acc)}.gtag{display:block;font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--acc);margin-bottom:1px}.pill.gp{background:var(--acc);color:var(--sf)}.gmem{margin:2px 0 6px 14px;padding-left:12px;border-left:3px solid var(--acc);display:grid;gap:8px}.itw.in{border:2px solid var(--okb)}.itw.warn{border:2px solid var(--lar)}.itw.hot{border:2px solid var(--verm)}.itw.in .alv{border-top-color:var(--okb)}.itw.warn .alv{border-top-color:var(--lar)}.itw.hot .alv{border-top-color:var(--verm)}.itw.sel{box-shadow:0 0 0 3px var(--accsoft),0 0 0 4px var(--acc)}
+.item.gi{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"t s";padding:6px 10px;gap:8px}.itw.grp .item.gi .ti b{font-size:14px}
 .item{display:grid;grid-template-columns:52px minmax(0,1fr) auto;grid-template-areas:"f t p" "f s sp";gap:4px 10px;align-items:center;width:100%;text-align:left;padding:10px;border:0;background:none}
 .alv{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;padding:0 10px 10px;border-top:1px dashed var(--bd);padding-top:8px;font-size:13px}.alv .val{width:84px}.alv .mut{margin-right:2px}
 .item .foto{grid-area:f;width:52px;height:52px;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:8px;overflow:hidden}
@@ -177,10 +178,10 @@ function renderEsq(){let h='',add='',grp='';
   if(i.grupoId==null||!gnome(i.grupoId)){h+=card(i);continue}
   if(vistos.has(i.grupoId))continue;vistos.add(i.grupoId);
   const gid=i.grupoId,todos=S.itens.filter(x=>x.grupoId===gid),aqui=vis.filter(x=>x.grupoId===gid);
-  const precos=todos.map(preco).filter(v=>v!=null),men=precos.length?Math.min(...precos):null,rep=todos.slice().sort((x,y)=>(preco(x)??1e9)-(preco(y)??1e9))[0];
   const buscando=!!F.q.trim(),aberto=S.abertos.has(gid)||F.gr===String(gid)||(buscando&&aqui.length>0);
-  h+='<div class="itw grp'+(S.gsel===gid?' sel':'')+'" data-dg="'+gid+'"><button type="button" class="item" data-gid="'+gid+'" aria-pressed="'+(S.gsel===gid)+'" aria-expanded="'+aberto+'">'+foto(rep)
-   +'<span class="ti"><span class="gtag">'+(aberto?'▾':'▸')+' GRUPO</span><b>'+esc(gnome(gid))+'</b></span><span class="pr num">'+(men!=null?brl(men):'—')+'</span><span class="stt"><span class="pill gp">▦ '+(buscando&&aqui.length!==todos.length?aqui.length+' de '+todos.length:todos.length)+' itens</span>'+(men!=null?'<span class="mut">menor preço</span>':'')+'</span></button></div>';
+  const dentro=todos.filter(x=>!(x.falhasSeguidas>0)&&status(x).k==='below').length;
+  h+='<div class="itw grp'+(S.gsel===gid?' sel':'')+'" data-dg="'+gid+'"><button type="button" class="item gi" data-gid="'+gid+'" aria-pressed="'+(S.gsel===gid)+'" aria-expanded="'+aberto+'">'
+   +'<span class="ti"><span class="gtag">'+(aberto?'▾':'▸')+' GRUPO</span><b>'+esc(gnome(gid))+'</b></span><span class="stt"><span class="pill gp">▦ '+(buscando&&aqui.length!==todos.length?aqui.length+' de '+todos.length:todos.length)+' itens</span>'+(dentro?'<span class="pill below" title="Itens do grupo dentro do alvo">● '+dentro+' dentro do alvo</span>':'')+'</span></button></div>';
   if(aberto)h+='<div class="gmem">'+aqui.map(card).join('')+'</div>'}
  h+='</div>';
  if(!S.itens.length)h+='<div class="cd vazio">Nenhum item rastreado. Cole um link da Amazon acima ou no bot do Telegram.</div>';
