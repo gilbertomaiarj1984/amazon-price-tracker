@@ -47,6 +47,11 @@ CREATE TABLE IF NOT EXISTS alert_state (
   disponivel INTEGER,
   PRIMARY KEY (product_id, linha)
 );
+CREATE TABLE IF NOT EXISTS grupos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  criado_em TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS meta (
   key TEXT PRIMARY KEY,
   value TEXT
@@ -63,6 +68,14 @@ export interface Product {
   usadoOn: boolean;
   falhasSeguidas: number;
   imagem: string | null;
+  /** Um item está em no máximo um grupo. */
+  grupoId: number | null;
+}
+
+export interface Grupo {
+  id: number;
+  nome: string;
+  criadoEm: string;
 }
 
 export interface LineStats {
@@ -84,6 +97,7 @@ interface ProductRow {
   usado_on: number;
   falhas_seguidas: number;
   imagem: string | null;
+  grupo_id: number | null;
 }
 
 const toProduct = (r: ProductRow): Product => ({
@@ -96,6 +110,7 @@ const toProduct = (r: ProductRow): Product => ({
   usadoOn: r.usado_on === 1,
   falhasSeguidas: r.falhas_seguidas,
   imagem: r.imagem ?? null,
+  grupoId: r.grupo_id ?? null,
 });
 
 export class Store {
@@ -107,6 +122,7 @@ export class Store {
     this.db.exec(SCHEMA);
     const cols = this.db.query("PRAGMA table_info(products)").all() as Array<{ name: string }>;
     if (!cols.some((c) => c.name === "imagem")) this.db.exec("ALTER TABLE products ADD COLUMN imagem TEXT");
+    if (!cols.some((c) => c.name === "grupo_id")) this.db.exec("ALTER TABLE products ADD COLUMN grupo_id INTEGER REFERENCES grupos(id) ON DELETE SET NULL");
   }
 
   close(): void {
@@ -139,6 +155,40 @@ export class Store {
 
   numberOf(id: number): number {
     return this.list().findIndex((p) => p.id === id) + 1;
+  }
+
+  listGrupos(): Grupo[] {
+    return (this.db.query("SELECT id, nome, criado_em FROM grupos ORDER BY nome COLLATE NOCASE").all() as Array<{ id: number; nome: string; criado_em: string }>).map((r) => ({ id: r.id, nome: r.nome, criadoEm: r.criado_em }));
+  }
+
+  getGrupo(id: number): Grupo | null {
+    return this.listGrupos().find((g) => g.id === id) ?? null;
+  }
+
+  /** Devolve null se já existe um grupo com esse nome (sem diferenciar maiúsculas). */
+  addGrupo(nome: string, now: string): Grupo | null {
+    const r = this.db.query("INSERT OR IGNORE INTO grupos (nome, criado_em) VALUES (?, ?)").run(nome, now);
+    return r.changes ? this.getGrupo(Number(r.lastInsertRowid)) : null;
+  }
+
+  /** false se o nome já é de outro grupo. */
+  renameGrupo(id: number, nome: string): boolean {
+    try {
+      this.db.query("UPDATE grupos SET nome = ? WHERE id = ?").run(nome, id);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Apaga só o grupo: os itens ficam, sem grupo. */
+  removeGrupo(id: number): void {
+    this.db.query("UPDATE products SET grupo_id = NULL WHERE grupo_id = ?").run(id);
+    this.db.query("DELETE FROM grupos WHERE id = ?").run(id);
+  }
+
+  setGrupo(productId: number, grupoId: number | null): void {
+    this.db.query("UPDATE products SET grupo_id = ? WHERE id = ?").run(grupoId, productId);
   }
 
   setImagem(id: number, url: string): void {

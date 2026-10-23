@@ -71,3 +71,30 @@ describe("Store", () => {
     expect(s.getMeta("k")).toBeNull();
   });
 });
+
+describe("grupos e migração", () => {
+  test("banco antigo (sem grupo_id) é migrado sem perder itens", () => {
+    const { Database } = require("bun:sqlite");
+    const path = `${require("node:os").tmpdir()}/mig-${Date.now()}.db`;
+    const old = new Database(path, { create: true });
+    old.exec("CREATE TABLE products (id INTEGER PRIMARY KEY AUTOINCREMENT, asin TEXT NOT NULL UNIQUE, titulo TEXT, criado_em TEXT NOT NULL, pausado INTEGER NOT NULL DEFAULT 0, terceiros_on INTEGER NOT NULL DEFAULT 0, usado_on INTEGER NOT NULL DEFAULT 0, falhas_seguidas INTEGER NOT NULL DEFAULT 0, imagem TEXT); INSERT INTO products (asin, titulo, criado_em) VALUES ('B097BYXGXN', 'X', 't')");
+    old.close();
+    const s = new Store(path);
+    expect(s.list().map((p) => [p.asin, p.grupoId])).toEqual([["B097BYXGXN", null]]);
+    s.close();
+    new Store(path).close();
+    require("node:fs").rmSync(path);
+  });
+
+  test("nome de grupo é único sem diferenciar maiúsculas; apagar solta os itens", () => {
+    const s = new Store();
+    const g = s.addGrupo("Fone", "t")!;
+    expect(s.addGrupo("FONE", "t")).toBeNull();
+    const o = s.addGrupo("Outro", "t")!;
+    expect(s.renameGrupo(o.id, "fone")).toBe(false);
+    const p = s.addProduct("B097BYXGXN", null, "t");
+    s.setGrupo(p.id, g.id);
+    s.removeGrupo(g.id);
+    expect(s.getById(p.id)!.grupoId).toBeNull();
+  });
+});

@@ -3,7 +3,7 @@ import { parseKeepaList, MAX_IMPORT } from "./keepa.ts";
 import { Actions, MAX_BATCH, consultaLiberadaEm, RESOLVE_ERRORS, extractLinks, mutedUntil } from "./actions.ts";
 import type { ActionDeps } from "./actions.ts";
 import { productUrl } from "./amazon/fetch.ts";
-import type { Product, Store } from "./db.ts";
+import type { Grupo, Product, Store } from "./db.ts";
 import { parseUserNumber } from "./numbers.ts";
 import { PANEL_HTML } from "./panel-page.ts";
 import { DAY_MS, buildView } from "./view.ts";
@@ -28,6 +28,7 @@ export interface PanelItem {
   url: string;
   imagem: string | null;
   criadoEm: string;
+  grupoId: number | null;
   linhas: ReturnType<typeof buildView>["linhas"];
   /** Preço da Amazon (ou da linha mais barata ligada) nos últimos 7 dias, para o mini-gráfico. */
   mini: Array<{ t: string; v: number }>;
@@ -75,7 +76,7 @@ export function panelItems(store: Store, now: Date): PanelItem[] {
         "SELECT coletado_em AS t, preco AS v FROM price_lines WHERE product_id = ? AND linha = ? AND coletado_em >= ? ORDER BY coletado_em",
       )
       .all(p.id, v.linhas.amazon.atual != null || v.linhas.amazon.coletas > 0 ? "amazon" : "terceiros", desde) as PanelItem["mini"];
-    return { num: v.num, asin: p.asin, titulo: p.titulo, pausado: p.pausado, falhasSeguidas: p.falhasSeguidas, silenciadoAte: mutedUntil(store, p.id, now), url: productUrl(p.asin), imagem: p.imagem && IMAGE_HOST_RE.test(p.imagem) ? p.imagem : null, criadoEm: p.criadoEm, linhas: v.linhas, mini: rows };
+    return { num: v.num, asin: p.asin, titulo: p.titulo, pausado: p.pausado, falhasSeguidas: p.falhasSeguidas, silenciadoAte: mutedUntil(store, p.id, now), url: productUrl(p.asin), imagem: p.imagem && IMAGE_HOST_RE.test(p.imagem) ? p.imagem : null, criadoEm: p.criadoEm, grupoId: p.grupoId, linhas: v.linhas, mini: rows };
   });
 }
 
@@ -138,6 +139,47 @@ export function panelDetail(store: Store, p: Product, now: Date, days: number) {
     ofertasEm: lastAt,
     ofertas,
   };
+}
+
+export const MAX_GRUPOS = 100;
+export const MAX_NOME_GRUPO = 60;
+
+/** Linha que representa o item na comparação: Amazon se já houve coleta dela, senão Terceiros. */
+const linhaPrincipal = (v: ReturnType<typeof buildView>): LineKey => (v.linhas.amazon.coletas > 0 ? "amazon" : "terceiros");
+
+/** Itens do grupo lado a lado: preço atual, alvo e histórico de cada um. `menorAsin` é o item mais barato agora. */
+export function panelGrupo(store: Store, g: Grupo, now: Date, days: number) {
+  const desde = iso(now.getTime() - days * DAY_MS);
+  const itens = store
+    .list()
+    .filter((p) => p.grupoId === g.id)
+    .map((p) => {
+      const v = buildView(store, p, now);
+      const linha = linhaPrincipal(v);
+      const l = v.linhas[linha];
+      const serie = store.db
+        .query("SELECT coletado_em AS t, preco AS v FROM price_lines WHERE product_id = ? AND linha = ? AND coletado_em >= ? ORDER BY coletado_em")
+        .all(p.id, linha, desde) as Array<{ t: string; v: number }>;
+      return {
+        num: v.num,
+        asin: p.asin,
+        titulo: p.titulo,
+        imagem: p.imagem && IMAGE_HOST_RE.test(p.imagem) ? p.imagem : null,
+        url: productUrl(p.asin),
+        pausado: p.pausado,
+        linha,
+        atual: l.atual,
+        vendedor: l.vendedor,
+        alvo: l.alvo,
+        min: l.min,
+        max: l.max,
+        serie,
+      };
+    });
+  let menorAsin: string | null = null;
+  let menor = Infinity;
+  for (const i of itens) if (i.atual != null && i.atual < menor) ((menor = i.atual), (menorAsin = i.asin));
+  return { id: g.id, nome: g.nome, dias: days, desde, itens, menorAsin, menorPreco: menorAsin ? menor : null };
 }
 
 const json = (body: unknown, status = 200) =>
@@ -270,6 +312,35 @@ function alvoOf(v: unknown): number | null {
   return Math.round(n * 100) / 100;
 }
 
+function nomeGrupoOf(v: unknown): string {
+  const n = typeof v === "string" ? v.replace(/\s+/g, " ").trim() : "";
+  if (!n || n.length > MAX_NOME_GRUPO) throw new HttpError(400, `nome do grupo deve ter de 1 a ${MAX_NOME_GRUPO} caracteres`);
+  return n;
+}
+
+/** Rotas de escrita sobre grupos. Apagar um grupo não apaga os itens. */
+async function grupoWrite(d: PanelDeps, method: string, id: number | null, req: Request): Promise<Response> {
+  const now = d.now();
+  if (id == null) {
+    if (method !== "POST") return json({ erro: "método não permitido" }, 405);
+    const nome = nomeGrupoOf((await readBody(req))["nome"]);
+    if (d.store.listGrupos().length >= MAX_GRUPOS) throw new HttpError(409, `limite de ${MAX_GRUPOS} grupos`);
+    const g = d.store.addGrupo(nome, now.toISOString());
+    if (!g) throw new HttpError(409, "já existe um grupo com esse nome");
+    return json({ id: g.id, nome: g.nome });
+  }
+  const g = d.store.getGrupo(id);
+  if (!g) return json({ erro: "não encontrado" }, 404);
+  if (method === "DELETE") {
+    d.store.removeGrupo(id);
+    return json({ removido: true });
+  }
+  if (method !== "PUT") return json({ erro: "método não permitido" }, 405);
+  const nome = nomeGrupoOf((await readBody(req))["nome"]);
+  if (!d.store.renameGrupo(id, nome)) throw new HttpError(409, "já existe um grupo com esse nome");
+  return json({ id, nome });
+}
+
 export interface AddItemResult {
   link: string;
   status: "novo" | "existente" | "erro";
@@ -350,6 +421,12 @@ async function itemWrite(d: PanelDeps, act: Actions, method: string, p: Product,
     case "silencio":
       act.silenciar(p, bool(body["silenciado"], "silenciado"));
       return detail();
+    case "grupo": {
+      const gid = body["grupoId"];
+      if (gid !== null && (typeof gid !== "number" || !Number.isInteger(gid) || !d.store.getGrupo(gid))) throw new HttpError(400, "grupo não encontrado");
+      d.store.setGrupo(p.id, gid);
+      return detail();
+    }
     case "linhas": {
       const linha = lineOf(body["linha"], ["terceiros", "usado"]) as "terceiros" | "usado";
       const on = bool(body["ligada"], "ligada");
@@ -369,7 +446,7 @@ export function panelHandler(d: PanelDeps): (req: Request) => Promise<Response> 
     const url = new URL(req.url);
     const path = url.pathname;
     if (path === "/") return new Response(PANEL_HTML, { headers: { "content-type": "text/html; charset=utf-8" } });
-    if (path === "/api/itens") return json({ saude: panelHealth(d.store, d.now(), d.intervalMin), itens: panelItems(d.store, d.now()), edicao: act != null });
+    if (path === "/api/itens") return json({ saude: panelHealth(d.store, d.now(), d.intervalMin), itens: panelItems(d.store, d.now()), grupos: d.store.listGrupos().map((g) => ({ id: g.id, nome: g.nome })), edicao: act != null });
     if (path.startsWith("/api/selo/")) {
       const m = /^\/api\/selo\/([A-Z0-9]{10})$/.exec(path);
       if (!d.token) return json({ erro: "não encontrado" }, 404);
@@ -378,6 +455,13 @@ export function panelHandler(d: PanelDeps): (req: Request) => Promise<Response> 
       return p ? json(panelSelo(d.store, p, d.now())) : json({ rastreado: false }, 404);
     }
     if (path === "/api/saude") return json(panelHealth(d.store, d.now(), d.intervalMin));
+    const gm = /^\/api\/grupos\/(\d{1,9})$/.exec(path);
+    if (gm) {
+      const g = d.store.getGrupo(Number(gm[1]));
+      const gd = Number(url.searchParams.get("dias") ?? 14);
+      if (!g) return json({ erro: "não encontrado" }, 404);
+      return (PANEL_DAYS as readonly number[]).includes(gd) ? json(panelGrupo(d.store, g, d.now(), gd)) : json({ erro: "dias deve ser 7, 14 ou 30" }, 400);
+    }
     const m = /^\/api\/itens\/([A-Z0-9]{10})$/.exec(path);
     const p = m ? d.store.getByAsin(m[1]!) : null;
     if (!p) return json({ erro: "não encontrado" }, 404);
@@ -389,10 +473,12 @@ export function panelHandler(d: PanelDeps): (req: Request) => Promise<Response> 
     const url = new URL(req.url);
     const path = url.pathname;
     // Só estas rotas escrevem. /api/selo/* e o token do selo nunca chegam aqui.
-    const item = /^\/api\/itens\/([A-Z0-9]{10})(?:\/(alvo|pausa|silencio|linhas|consultar))?$/.exec(path);
-    if (!act || (path !== "/api/itens" && path !== "/api/importar" && !item)) return json({ erro: "método não permitido" }, 405);
+    const item = /^\/api\/itens\/([A-Z0-9]{10})(?:\/(alvo|pausa|silencio|linhas|consultar|grupo))?$/.exec(path);
+    const grp = /^\/api\/grupos(?:\/(\d{1,9}))?$/.exec(path);
+    if (!act || (path !== "/api/itens" && path !== "/api/importar" && !item && !grp)) return json({ erro: "método não permitido" }, 405);
     try {
       checkSameOrigin(req, url);
+      if (grp) return await grupoWrite(d, req.method, grp[1] ? Number(grp[1]) : null, req);
       if (path === "/api/importar") {
         if (req.method !== "POST") return json({ erro: "método não permitido" }, 405);
         return json(importItems(d.store, d.now(), await readBody(req)));

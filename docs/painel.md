@@ -105,3 +105,13 @@ A lista de itens é uma grade de cards: foto, título, preço atual da Amazon, a
 ## Consultar agora
 
 Botão por item (detalhe do painel e card do `/item N` no Telegram). Usa o mesmo caminho da rodada agendada: mesma fila (nunca duas leituras ao mesmo tempo; se a rodada estiver rodando, espera a vez), mesma detecção de bloqueio/captcha, grava histórico e dispara alertas. Cada item só pode ser consultado de novo após 5 minutos (o botão mostra o tempo restante; falha também conta). Some com `PANEL_READONLY=1`.
+
+## Grupos de itens similares
+
+Na Amazon o mesmo produto costuma ter vários cadastros (edições, cores, anúncios duplicados). Para ver todos juntos:
+
+1. Abra um item e, no campo **Grupo**, escolha **+ Novo grupo…** (ou um grupo que já existe). Um item fica em no máximo um grupo.
+2. Clique em **Ver grupo** para comparar: tabela com preço atual, diferença para o menor, alvo, mínimo e máximo de cada item, e um gráfico com uma linha por item.
+3. No filtro da lista há o seletor **Todos os grupos / Sem grupo / cada grupo**.
+
+Apagar um grupo não apaga os itens. O alvo continua sendo por item. As escritas seguem atrás do login e respeitam `PANEL_READONLY=1`. O banco migra sozinho (nova tabela `grupos` e coluna `products.grupo_id`), sem mexer no histórico.
