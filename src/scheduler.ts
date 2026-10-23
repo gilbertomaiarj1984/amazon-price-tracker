@@ -43,7 +43,8 @@ async function sendWithRetry(d: CycleDeps, html: string, kb?: Button[][], photo?
 }
 
 export async function runCycle(d: CycleDeps): Promise<CycleResult> {
-  const products = d.store.list().filter((p) => !p.pausado);
+  // Itens com estrela primeiro (sort é estável: a ordem de cadastro se mantém dentro de cada faixa).
+  const products = d.store.list().filter((p) => !p.pausado).sort((a, b) => Number(b.estrela) - Number(a.estrela));
   const res: CycleResult = { tentados: 0, ok: 0, falhas: 0, alertas: 0 };
   const kinds = new Set<string>();
 

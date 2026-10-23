@@ -40,6 +40,14 @@ beforeEach(() => {
 });
 
 describe("runCycle", () => {
+  test("itens com estrela são coletados primeiro", async () => {
+    store.addProduct("B00C061HZY", "Disco", "2026-10-23T00:00:00.000Z");
+    store.setEstrela(2, true);
+    const ordem: string[] = [];
+    await runCycle({ ...deps(), collect: async (p) => (ordem.push(p.asin), collectOne(store, p, net.deps)) });
+    expect(ordem).toEqual(["B00C061HZY", "B097BYXGXN"]);
+  });
+
   test("coleta, grava e avisa o alvo uma vez", async () => {
     store.setAlvo(1, "amazon", 25);
     expect(await runCycle(deps())).toMatchObject({ tentados: 1, ok: 1, falhas: 0, alertas: 1 });

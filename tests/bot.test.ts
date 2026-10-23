@@ -185,6 +185,12 @@ describe("comandos", () => {
     await bot.handleText("/pausar 1");
     expect(store.getById(1)?.pausado).toBe(false);
   });
+  test("/estrela alterna", async () => {
+    await bot.handleText("/estrela 1");
+    expect(store.getById(1)?.estrela).toBe(true);
+    await bot.handleText("/estrela 1");
+    expect(store.getById(1)?.estrela).toBe(false);
+  });
   test("/remover pede confirmação e só então apaga", async () => {
     await bot.handleText("/remover 1");
     expect(store.list()).toHaveLength(1);

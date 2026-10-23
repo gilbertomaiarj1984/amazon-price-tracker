@@ -127,6 +127,12 @@ export class Bot {
         const pausado = this.act.setPausa(p);
         return this.d.send(pausado ? `Item #${n} pausado. Sem coletas nem alertas até você retomar.` : `Item #${n} retomado.`);
       }
+      case "/estrela": {
+        const p = await needP();
+        if (!p) return;
+        const estrela = this.act.setEstrela(p);
+        return this.d.send(estrela ? `★ Item #${n} marcado com estrela: é coletado primeiro em cada rodada.` : `Item #${n} sem estrela.`);
+      }
       case "/remover": {
         const p = await needP();
         if (!p) return;
