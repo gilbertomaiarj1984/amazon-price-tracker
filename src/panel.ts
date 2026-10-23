@@ -1,6 +1,7 @@
 import type { Product, Store } from "./db.ts";
 import { PANEL_HTML } from "./panel-page.ts";
 import { DAY_MS, buildView } from "./view.ts";
+import { timingSafeEqual } from "node:crypto";
 import { LINE_KEYS } from "./types.ts";
 import type { LineKey } from "./types.ts";
 
@@ -135,7 +136,46 @@ const SECURITY = {
   "referrer-policy": "no-referrer",
 };
 
+export type Veredito = "minimo" | "bom" | "acima" | "sem_dados";
+
+export interface Selo {
+  rastreado: true;
+  linha: LineKey;
+  atual: number | null;
+  min: number | null;
+  max: number | null;
+  media: number | null;
+  coletas: number;
+  veredito: Veredito;
+  atualizadoEm: string | null;
+}
+
+/** Dados mínimos para o selo do userscript: nada de ofertas, vendedores, alvos ou configuração. */
+export function panelSelo(store: Store, p: Product, now: Date): Selo {
+  const v = buildView(store, p, now);
+  const linha: LineKey = v.linhas.amazon.coletas > 0 ? "amazon" : "terceiros";
+  const l = v.linhas[linha];
+  const desde = iso(now.getTime() - 30 * DAY_MS);
+  const avg = store.db
+    .query("SELECT AVG(preco) AS m, MAX(coletado_em) AS t FROM price_lines WHERE product_id = ? AND linha = ? AND coletado_em >= ?")
+    .get(p.id, linha, desde) as { m: number | null; t: string | null };
+  const media = avg.m == null ? null : Math.round(avg.m * 100) / 100;
+  let veredito: Veredito = "sem_dados";
+  if (l.atual != null && l.min != null && media != null && l.coletas >= 3) {
+    veredito = l.atual <= l.min * 1.02 ? "minimo" : l.atual <= media ? "bom" : "acima";
+  }
+  return { rastreado: true, linha, atual: l.atual, min: l.min, max: l.max, media, coletas: l.coletas, veredito, atualizadoEm: avg.t };
+}
+
+function tokenOk(given: string | null, expected: string): boolean {
+  const a = Buffer.from(given ?? "");
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 export interface PanelDeps {
+  /** Token do endpoint /api/selo; sem ele a rota responde 404. */
+  token?: string | null;
   store: Store;
   now: () => Date;
   intervalMin: number;
@@ -150,7 +190,15 @@ export function panelHandler(d: PanelDeps): (req: Request) => Response {
     let res: Response;
     if (path === "/") res = new Response(PANEL_HTML, { headers: { "content-type": "text/html; charset=utf-8" } });
     else if (path === "/api/itens") res = json({ saude: panelHealth(d.store, d.now(), d.intervalMin), itens: panelItems(d.store, d.now()) });
-    else if (path === "/api/saude") res = json(panelHealth(d.store, d.now(), d.intervalMin));
+    else if (path.startsWith("/api/selo/")) {
+      const m = /^\/api\/selo\/([A-Z0-9]{10})$/.exec(path);
+      if (!d.token) res = json({ erro: "não encontrado" }, 404);
+      else if (!tokenOk(req.headers.get("x-selo-token"), d.token)) res = json({ erro: "não autorizado" }, 401);
+      else {
+        const p = m ? d.store.getByAsin(m[1]!) : null;
+        res = p ? json(panelSelo(d.store, p, d.now())) : json({ rastreado: false }, 404);
+      }
+    } else if (path === "/api/saude") res = json(panelHealth(d.store, d.now(), d.intervalMin));
     else {
       const m = /^\/api\/itens\/([A-Z0-9]{10})$/.exec(path);
       const p = m ? d.store.getByAsin(m[1]!) : null;

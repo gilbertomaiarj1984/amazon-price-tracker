@@ -34,9 +34,24 @@ describe("userscript", () => {
     const many = Array.from({ length: 30 }, (_, i) => `B0000000${String(i).padStart(2, "0")}`);
     expect(core.uniqueAsins(many)).toHaveLength(core.MAX);
   });
-  test("sem rede nem token", () => {
+  test("rede só para o painel e nenhum segredo no arquivo", () => {
     const src = readFileSync(path, "utf8");
-    expect(src).not.toMatch(/fetch\(|XMLHttpRequest|GM_xmlhttpRequest|@connect|api\.telegram|TOKEN/i);
+    expect(src).not.toMatch(/fetch\(|api\.telegram|bot\d+:|[0-9a-f]{32}/i);
+    expect([...src.matchAll(/@connect\s+(\S+)/g)].map((m) => m[1])).toEqual(["precos.143-95-214-240.sslip.io"]);
     expect(src).toMatch(/@match\s+https:\/\/www\.amazon\.com\.br\/\*/);
+  });
+});
+
+describe("selo", () => {
+  const sv = (core as any).seloView as (s: unknown) => { cor: string; linhas: string[] };
+  test("item não rastreado convida a rastrear", () => {
+    expect(sv({ rastreado: false }).linhas[0]).toContain("Não rastreado");
+  });
+  test("mostra veredito, mínimo, máximo e média em reais", () => {
+    const v = sv({ rastreado: true, veredito: "bom", min: 8, max: 12.5, media: 10, atual: 9 });
+    expect(v.linhas).toEqual(["Abaixo da média de 30 dias", "Mín R$ 8,00 · Máx R$ 12,50 · Média R$ 10,00"]);
+  });
+  test("veredito desconhecido cai em histórico curto", () => {
+    expect(sv({ rastreado: true, veredito: "x" }).linhas[0]).toBe("Histórico ainda curto");
   });
 });

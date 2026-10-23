@@ -1,15 +1,21 @@
 // ==UserScript==
 // @name         Rastreador de preços: copiar links
 // @namespace    price-tracker-local
-// @version      1.0.0
+// @version      2.0.0
 // @description  Botão "Rastrear" na página do produto e seleção de vários itens na busca. Copia os links para colar no bot do Telegram.
 // @match        https://www.amazon.com.br/*
 // @grant        GM_setClipboard
+// @grant        GM_xmlhttpRequest
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        GM_registerMenuCommand
+// @connect      precos.143-95-214-240.sslip.io
 // @run-at       document-idle
 // ==/UserScript==
 
-// Sem rede nem credenciais: o script só lê a página aberta e copia links limpos
-// (https://www.amazon.com.br/dp/ASIN) para a área de transferência. Quem cadastra é o bot.
+// Copia links limpos (https://www.amazon.com.br/dp/ASIN) para o bot cadastrar.
+// Selo de histórico (opcional): só consulta GET /api/selo/ASIN do painel, com um token só de
+// leitura guardado no armazenamento do Tampermonkey (menu do script). Nenhum segredo fica neste arquivo.
 
 (function () {
   "use strict";
@@ -28,7 +34,24 @@
     return [...new Set(list.filter(Boolean).map((a) => String(a).toUpperCase()))].filter((a) => /^[A-Z0-9]{10}$/.test(a)).slice(0, MAX);
   }
 
-  const core = { asinFromPath, linkFor, isProductPath, isSearchPath, uniqueAsins, MAX };
+  const brl = (n) => "R$ " + n.toFixed(2).replace(".", ",");
+  const VEREDITOS = {
+    minimo: ["#1b7f3b", "No menor preço de 30 dias"],
+    bom: ["#2e8b57", "Abaixo da média de 30 dias"],
+    acima: ["#b8651b", "Acima da média de 30 dias"],
+    sem_dados: ["#5b6670", "Histórico ainda curto"],
+  };
+  /** Texto e cor do selo a partir da resposta do painel. */
+  function seloView(s) {
+    if (!s || s.rastreado === false) return { cor: "#5b6670", linhas: ["Não rastreado ainda", "Clique em Rastrear este produto"] };
+    const [cor, titulo] = VEREDITOS[s.veredito] || VEREDITOS.sem_dados;
+    const linhas = [titulo];
+    if (s.min != null && s.max != null) linhas.push(`Mín ${brl(s.min)} · Máx ${brl(s.max)}` + (s.media != null ? ` · Média ${brl(s.media)}` : ""));
+    if (s.atual != null && s.atual === s.min && s.veredito !== "minimo") linhas.push("Preço atual é o mínimo registrado");
+    return { cor, linhas };
+  }
+
+  const core = { asinFromPath, linkFor, isProductPath, isSearchPath, uniqueAsins, seloView, MAX };
   if (typeof module !== "undefined" && module.exports) {
     module.exports = core;
     return;
@@ -56,9 +79,49 @@
     return b;
   }
 
+  const PANEL_URL = "https://precos.143-95-214-240.sslip.io";
+  const getCfg = (k) => (typeof GM_getValue === "function" ? GM_getValue(k, "") : "");
+
+  if (typeof GM_registerMenuCommand === "function") {
+    GM_registerMenuCommand("Definir token do selo de histórico", () => {
+      const v = prompt("Cole o PANEL_TOKEN (fica só neste navegador). Vazio apaga:", getCfg("token"));
+      if (v === null) return;
+      GM_setValue("token", v.trim());
+      toast(v.trim() ? "Token salvo. Recarregue a página." : "Token apagado.");
+    });
+  }
+
+  function showSelo(asin) {
+    const token = getCfg("token");
+    if (!token || typeof GM_xmlhttpRequest !== "function") return;
+    GM_xmlhttpRequest({
+      method: "GET",
+      url: `${PANEL_URL}/api/selo/${asin}`,
+      headers: { "x-selo-token": token },
+      timeout: 8000,
+      onload: (r) => {
+        let data = null;
+        if (r.status === 401) return toast("Selo: token recusado. Troque no menu do Tampermonkey.");
+        if (r.status !== 200 && r.status !== 404) return;
+        try { data = JSON.parse(r.responseText); } catch { return; }
+        const v = seloView(data);
+        const box = document.createElement("div");
+        box.style.cssText = `position:fixed;right:16px;bottom:64px;z-index:2147483646;max-width:300px;padding:10px 14px;border-radius:10px;background:${v.cor};color:#fff;font:13px/1.4 system-ui;box-shadow:0 2px 8px rgba(0,0,0,.3)`;
+        v.linhas.forEach((t, i) => {
+          const d = document.createElement("div");
+          d.textContent = t;
+          if (i === 0) d.style.fontWeight = "600";
+          box.appendChild(d);
+        });
+        document.body.appendChild(box);
+      },
+    });
+  }
+
   function setupProduct() {
     const asin = asinFromPath(location.pathname);
     if (!asin) return;
+    showSelo(asin);
     floatingButton("Rastrear este produto", () => {
       copy(linkFor(asin));
       toast("Link copiado. Cole no chat do bot do Telegram.");

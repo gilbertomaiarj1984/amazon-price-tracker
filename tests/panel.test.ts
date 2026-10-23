@@ -103,3 +103,43 @@ describe("config do painel", () => {
   test("host explícito", () => expect(loadConfig({ ...base, PANEL_PORT: "8787", PANEL_HOST: "0.0.0.0" }).panel?.host).toBe("0.0.0.0"));
   test("porta inválida", () => expect(() => loadConfig({ ...base, PANEL_PORT: "abc" })).toThrow());
 });
+
+describe("selo do userscript", () => {
+  const TOKEN = "t".repeat(32);
+  const sel = (path: string, token?: string) =>
+    handle(new Request(`http://x${path}`, { headers: token ? { "x-selo-token": token } : {} }));
+  beforeEach(() => {
+    handle = panelHandler({ store, now: () => NOW, intervalMin: 30, token: TOKEN });
+  });
+
+  test("sem token configurado a rota não existe", () => {
+    handle = panelHandler({ store, now: () => NOW, intervalMin: 30 });
+    expect(sel("/api/selo/B097BYXGXN", TOKEN).status).toBe(404);
+  });
+  test("exige o token certo", () => {
+    expect(sel("/api/selo/B097BYXGXN").status).toBe(401);
+    expect(sel("/api/selo/B097BYXGXN", "errado").status).toBe(401);
+    expect(sel("/api/selo/B097BYXGXN?t=" + TOKEN).status).toBe(401);
+  });
+  test("item rastreado devolve só o resumo", async () => {
+    const j = (await sel("/api/selo/B097BYXGXN", TOKEN).json()) as any;
+    expect(Object.keys(j).sort()).toEqual(["atual", "atualizadoEm", "coletas", "linha", "max", "media", "min", "rastreado", "veredito"]);
+    expect(j.rastreado).toBe(true);
+    expect(j.atual).toBe(10);
+    expect(j.veredito).toBe("sem_dados");
+  });
+  test("veredito pelo preço atual", async () => {
+    const am = (preco: number) => ({ amazon: { linha: "amazon", preco, vendedor: "Amazon" } }) as const;
+    store.saveSnapshot(1, "2026-10-23T14:40:00.000Z", [], am(8));
+    store.saveSnapshot(1, "2026-10-23T14:50:00.000Z", [], am(20));
+    expect(((await sel("/api/selo/B097BYXGXN", TOKEN).json()) as any).veredito).toBe("acima");
+    store.saveSnapshot(1, "2026-10-23T14:55:00.000Z", [], am(8));
+    expect(((await sel("/api/selo/B097BYXGXN", TOKEN).json()) as any).veredito).toBe("minimo");
+  });
+  test("item não rastreado e ASIN inválido", async () => {
+    const r = sel("/api/selo/B000000000", TOKEN);
+    expect(r.status).toBe(404);
+    expect(((await r.json()) as any).rastreado).toBe(false);
+    expect(sel("/api/selo/x", TOKEN).status).toBe(404);
+  });
+});
