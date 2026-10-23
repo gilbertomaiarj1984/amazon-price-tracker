@@ -132,7 +132,7 @@ function passa(i){const a=i.linhas.amazon,t=sem(i.titulo)+' '+i.asin.toLowerCase
  switch(F.st){case 'dentro':if(!(a.atual!=null&&a.alvo!=null&&a.atual<=a.alvo))return false;break;
   case 'acima':if(!(a.atual!=null&&a.alvo!=null&&a.atual>a.alvo))return false;break;
   case 'semalvo':if(a.alvo!=null)return false;break;case 'pausado':if(!i.pausado)return false;break;
-  case 'falha':if(!(i.falhasSeguidas>0))return false;break;case 'semoferta':if(!(lido(i)==='ok'&&a.atual==null))return false;break;
+  case 'falha':if(!(i.falhasSeguidas>0))return false;break;case 'semoferta':if(!(lido(i)==='ok'&&(a.atual==null||a.terceiro)))return false;break;
   case 'semcoleta':if(lido(i)==='ok')return false;break}
  if(F.gr==='none'?i.grupoId!=null:F.gr&&String(i.grupoId)!==F.gr)return false;
  if(F.ln&&!i.linhas[F.ln].ligada)return false;
@@ -165,7 +165,7 @@ function renderEsq(){let h='',add='',grp='';
  if(S.edit)grp+='<div class="gs"><b style="font-size:14px">Grupos</b> <span class="mut">Arraste um item sobre outro item ou sobre um grupo para agrupar.</span><div class="chips">'+S.grupos.map(g=>'<button type="button" class="chip'+(S.gsel===g.id?' on':'')+'" data-g="'+g.id+'">▦ '+esc(g.nome)+' ('+S.itens.filter(i=>i.grupoId===g.id).length+')</button>').join('')+'<button type="button" class="chip" data-g="none" title="Solte aqui para tirar o item do grupo">✕ Sem grupo</button></div></div>';
  h='<div class="lista">';const vis=visiveis();
  const card=i=>{const a=i.linhas.amazon,st=status(i);
-  const tags=(i.silenciadoAte?'<span class="pill">alertas silenciados</span>':'')+(i.falhasSeguidas>0?'<span class="pill fail">falha na coleta</span>':'')+'';
+  const tags=(a.terceiro?'<span class="pill" title="A Amazon não vende; este é o melhor terceiro">Terceiro: '+esc(a.vendedor||'?')+'</span>':'')+(i.silenciadoAte?'<span class="pill">alertas silenciados</span>':'')+(i.falhasSeguidas>0?'<span class="pill fail">falha na coleta</span>':'')+'';
   const cor=a.coletas?COR.amazon:COR.terceiros;
   const al=a.alvo,chips=a.atual!=null?[5,10,15].map(p=>{const v=Math.round(a.atual*(1-p/100));return '<button type="button" class="btn sm" data-cv="'+v+'" title="'+brl(v)+'">−'+p+'%</button>'}).join(''):'';
   const alv=S.edit?'<div class="alv" data-asin="'+esc(i.asin)+'"><span class="mut">Alvo</span><input type="text" class="val" inputmode="decimal" placeholder="ex.: 449" value="'+(al!=null?String(al).replace('.',','):'')+'" aria-label="Alvo da Amazon do item '+i.num+'"><button type="button" class="btn sm pri" data-cs="1">Definir</button>'+chips+(al!=null?'<button type="button" class="btn sm" data-cx="1" title="Remover alvo">×</button>':'')+'</div>':'';
@@ -279,7 +279,7 @@ function renderDir(){if(S.gsel!=null)return renderGrupo();const d=S.det,it=S.ite
  h+='<div class="tw"><table><tr><th>Linha de preço</th><th class="n">Agora</th><th class="n">Alvo</th><th class="n">Mín 30 d</th><th class="n">Máx 30 d</th><th class="n">Variação</th>'+(S.edit?'<th>Coleta</th>':'')+'</tr>';
  LK.forEach((k,idx)=>{const l=L[k],on=l.ligada;
   h+='<tr data-k="'+k+'"><td><i class="key" style="--c:'+COR[k]+'"></i><b style="font-weight:600">'+NOME[k]+'</b>'+(idx===0?' <span class="pill">principal</span>':'')+'</td>'
-   +'<td class="n num">'+(on?(l.atual!=null?brl(l.atual):idx===0&&lido(it)==='nunca'?'<span class="mut">aguardando</span>':idx===0&&lido(it)==='erro'?'<span class="mut">erro na coleta</span>':'<span class="mut">sem oferta</span>'):'<span class="mut">—</span>')+'</td>'
+   +'<td class="n num">'+(on?(l.atual!=null?brl(l.atual)+(l.terceiro?'<div class="mut">Terceiro · '+esc(l.vendedor||'?')+(l.terceiro.envio==='amazon'?' · enviado pela Amazon':l.terceiro.envio==='terceiro'?' · enviado pelo vendedor':'')+'</div>':''):idx===0&&lido(it)==='nunca'?'<span class="mut">aguardando</span>':idx===0&&lido(it)==='erro'?'<span class="mut">erro na coleta</span>':'<span class="mut">sem oferta</span>'):'<span class="mut">—</span>')+'</td>'
    +'<td class="n">'+(S.edit?'<input type="text" class="val" inputmode="decimal" data-alvo="'+k+'" value="'+(l.alvo!=null?String(l.alvo).replace('.',','):'')+'" placeholder="sem alvo" aria-label="Alvo da linha '+NOME[k]+'"'+(on?'':' disabled')+'>':(l.alvo!=null?brl(l.alvo):'—'))+'</td>'
    +'<td class="n num">'+(on?brl(l.min):'—')+'</td><td class="n num">'+(on?brl(l.max):'—')+'</td><td class="n num">'+(on&&l.variacao!=null?pct(l.variacao):'—')+'</td>'
    +(S.edit?'<td>'+(idx===0?'<span class="mut">sempre</span>':'<label><input type="checkbox" data-linha="'+k+'" '+(on?'checked':'')+'> coletar</label>')+'</td>':'')+'</tr>'});

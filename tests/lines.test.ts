@@ -33,9 +33,43 @@ describe("deriveLines", () => {
     expect(d.points.terceiros).toEqual({ linha: "terceiros", preco: 379, vendedor: "B" });
   });
   test("linhas desligadas não são derivadas", () => {
-    const d = deriveLines(page(), [offer({}), offer({ condicao: "usado", preco: 50 })], { terceiros: false, usado: false });
+    const amazon = offer({ vendedor: "Amazon", vendidoPorAmazon: true, preco: 90 });
+    const d = deriveLines(page(), [amazon, offer({}), offer({ condicao: "usado", preco: 50 })], { terceiros: false, usado: false });
     expect(d.points.terceiros).toBeUndefined();
     expect(d.points.usado).toBeUndefined();
+    expect(d.fallback).toBeNull();
+  });
+  test("sem Amazon: melhor terceiro novo vira fallback e é gravado em Terceiros, mesmo desligada", () => {
+    const d = deriveLines(
+      page(),
+      [
+        offer({ vendedor: "A", preco: 365, frete: 24.9 }),
+        offer({ vendedor: "B", preco: 379, envio: "amazon" }),
+        offer({ vendedor: "C", preco: 400 }),
+        offer({ vendedor: "U", condicao: "usado", preco: 10 }),
+      ],
+      { terceiros: false, usado: false },
+    );
+    expect(d.points.amazon).toBeUndefined();
+    expect(d.fallback).toEqual({ preco: 379, vendedor: "B", envio: "amazon" });
+    expect(d.points.terceiros).toEqual({ linha: "terceiros", preco: 379, vendedor: "B" });
+    expect(d.points.usado).toBeUndefined();
+  });
+  test("empate de preço: enviado pela Amazon ganha", () => {
+    const d = deriveLines(page(), [offer({ vendedor: "A", preco: 300 }), offer({ vendedor: "B", preco: 300, envio: "amazon" })], { terceiros: false, usado: false });
+    expect(d.fallback?.vendedor).toBe("B");
+  });
+  test("painel sem terceiros mas caixa de compra de terceiro: usa a caixa", () => {
+    const d = deriveLines(page({ buyBox: 469.33, buyBoxVendedor: "VORTEX IMPORT" }), [], { terceiros: false, usado: false });
+    expect(d.fallback).toEqual({ preco: 469.33, vendedor: "VORTEX IMPORT", envio: null });
+  });
+  test("sem nenhuma oferta: sem fallback", () => {
+    expect(deriveLines(page(), [], { terceiros: false, usado: false }).fallback).toBeNull();
+  });
+  test("Amazon vende: não há fallback", () => {
+    const d = deriveLines(page({ buyBox: 389, buyBoxVendedor: "Loja" }), [offer({ vendedor: "Amazon Global", vendidoPorAmazon: true, preco: 404.14 })], { terceiros: false, usado: false });
+    expect(d.fallback).toBeNull();
+    expect(d.points.amazon?.preco).toBe(404.14);
   });
   test("usado", () => {
     const d = deriveLines(page(), [offer({ condicao: "usado", preco: 301, vendedor: "Amazon Warehouse" })], {

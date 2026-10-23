@@ -1,6 +1,7 @@
 import { Database } from "bun:sqlite";
 import { EMPTY_ALERT_STATE } from "./alerts.ts";
 import type { AlertState } from "./alerts.ts";
+import type { Fallback } from "./lines.ts";
 import type { LineKey, LinePoint, Offer } from "./types.ts";
 
 const SCHEMA = `
@@ -334,6 +335,20 @@ export class Store {
     try {
       const u = JSON.parse(this.getMeta(`ultima_coleta:${id}`) ?? "null") as UltimaColeta | null;
       return u && typeof u.em === "string" && typeof u.ok === "boolean" ? u : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Melhor terceiro da última coleta em que a Amazon não vendia (null = a Amazon vende, ou não há terceiro). */
+  setFallback(id: number, f: Fallback | null): void {
+    this.setMeta(`fallback:${id}`, f ? JSON.stringify(f) : null);
+  }
+
+  getFallback(id: number): Fallback | null {
+    try {
+      const f = JSON.parse(this.getMeta(`fallback:${id}`) ?? "null") as Fallback | null;
+      return f && typeof f.preco === "number" ? f : null;
     } catch {
       return null;
     }

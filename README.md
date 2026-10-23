@@ -12,7 +12,7 @@ Cada produto tem até três **linhas de preço**, cada uma com histórico e alvo
 
 | Linha | O que é |
 |---|---|
-| **Amazon** (principal) | Oferta vendida pela própria Amazon. Fica sem dado quando a Amazon não vende; nunca é preenchida com preço de terceiro. |
+| **Amazon** (principal) | Oferta vendida pela própria Amazon. Fica sem dado quando a Amazon não vende; nunca é preenchida com preço de terceiro na série. Nesse caso o card, o painel e os alertas mostram o **melhor terceiro novo** (rotulado "Terceiro", com vendedor e FBA ou não), o alvo da linha Amazon vale para ele, e ele é gravado na série Terceiros. Não custa requisição extra: o painel de ofertas já é lido sempre que a caixa de compra não é da Amazon. |
 | **Terceiros (novo)** | Menor preço anunciado entre vendedores terceiros, condição nova. |
 | **Usado** | Menor preço anunciado entre ofertas usadas. |
 

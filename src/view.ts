@@ -15,6 +15,8 @@ export interface LineView {
   variacao: number | null;
   coletas: number;
   alvo: number | null;
+  /** Só na linha Amazon: ela não vende, e `atual`/`vendedor` são do melhor terceiro (novo). */
+  terceiro?: { envio: "amazon" | "terceiro" | null };
 }
 
 export interface ProductView {
@@ -34,7 +36,7 @@ export function buildView(store: Store, p: Product, now: Date): ProductView {
     const last = store.lastPoint(p.id, linha);
     const disp = store.getAlertState(p.id, linha).disponivel;
     const atual = ligada && last && disp !== false ? last.preco : null;
-    linhas[linha] = {
+    const view: LineView = {
       linha,
       ligada,
       atual,
@@ -45,6 +47,12 @@ export function buildView(store: Store, p: Product, now: Date): ProductView {
       coletas: st.coletas,
       alvo: store.getAlvo(p.id, linha),
     };
+    linhas[linha] = view;
+    const fb = linha === "amazon" && ligada && atual == null ? store.getFallback(p.id) : null;
+    if (fb) {
+      // O preço exibido passa a ser o do terceiro; a variação da série Amazon não vale para ele.
+      Object.assign(view, { atual: fb.preco, vendedor: fb.vendedor, variacao: null, terceiro: { envio: fb.envio } });
+    }
   }
   return { num: store.numberOf(p.id), titulo: p.titulo, asin: p.asin, pausado: p.pausado, linhas };
 }

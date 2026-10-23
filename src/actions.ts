@@ -91,7 +91,8 @@ export class Actions {
     this.store.setAlvo(p.id, linha, v);
     const last = this.store.lastPoint(p.id, linha);
     const disp = this.store.getAlertState(p.id, linha).disponivel;
-    const atual = last && disp !== false ? last.preco : null;
+    const fb = linha === "amazon" ? this.store.getFallback(p.id) : null;
+    const atual = last && disp !== false ? last.preco : (fb?.preco ?? null);
     return { ok: true, atual, dentro: v != null && atual != null && atual <= v };
   }
 

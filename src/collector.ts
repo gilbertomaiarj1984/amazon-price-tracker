@@ -27,6 +27,8 @@ export interface AlertItem {
   product: Product;
   evento: AlertEvent;
   vendedor: string | null;
+  /** O preço do evento é do melhor terceiro, porque a Amazon não vende agora. */
+  terceiro?: { envio: "amazon" | "terceiro" | null };
 }
 
 export type CollectOutcome =
@@ -74,26 +76,32 @@ async function collectInner(store: Store, product: Product, deps: CollectDeps): 
   }
 
   const fresh = store.getById(product.id) ?? product;
-  const { points, descartadas } = deriveLines(parsed, offers, { terceiros: fresh.terceirosOn, usado: fresh.usadoOn });
+  const { points, descartadas, fallback } = deriveLines(parsed, offers, { terceiros: fresh.terceirosOn, usado: fresh.usadoOn });
   const at = deps.now().toISOString();
   const enabled = LINE_KEYS.filter((k) => k === "amazon" || (k === "terceiros" ? fresh.terceirosOn : fresh.usadoOn));
 
   const alertas: AlertItem[] = [];
   const nextStates = enabled.map((linha) => {
-    const ponto = points[linha] ?? null;
+    // Sem Amazon, o alvo da linha Amazon vale para o melhor terceiro, e o alerta diz que ele é de terceiro.
+    const fb = linha === "amazon" ? fallback : null;
+    const ponto = fb ? { linha, preco: fb.preco, vendedor: fb.vendedor } : (points[linha] ?? null);
     const r = evaluate({
       linha,
       preco: ponto?.preco ?? null,
       alvo: store.getAlvo(fresh.id, linha),
-      minimoAnterior: store.minBefore(fresh.id, linha, at),
-      avisarNovoMinimo: true,
+      minimoAnterior: store.minBefore(fresh.id, fb ? "terceiros" : linha, at),
+      avisarNovoMinimo: !fb,
       prev: store.getAlertState(fresh.id, linha),
     });
-    for (const evento of r.eventos) alertas.push({ product: fresh, evento, vendedor: ponto?.vendedor ?? null });
+    // "Voltou a vender" é só da Amazon de verdade: com fallback a linha continua indisponível.
+    const eventos = fb ? r.eventos.filter((e) => e.tipo !== "voltou") : r.eventos;
+    if (fb) r.next.disponivel = false;
+    for (const evento of eventos) alertas.push({ product: fresh, evento, vendedor: ponto?.vendedor ?? null, ...(fb ? { terceiro: { envio: fb.envio } } : {}) });
     return { linha, next: r.next };
   });
 
   store.saveSnapshot(fresh.id, at, [...offers.map((o) => ({ ...o })), ...descartadas.map((o) => ({ ...o, descartada: true }))], points);
+  store.setFallback(fresh.id, fallback);
   for (const s of nextStates) store.setAlertState(fresh.id, s.linha, s.next);
   if (parsed.titulo && parsed.titulo !== fresh.titulo) store.setTitulo(fresh.id, parsed.titulo);
   if (parsed.imagem && parsed.imagem !== fresh.imagem) store.setImagem(fresh.id, parsed.imagem);
