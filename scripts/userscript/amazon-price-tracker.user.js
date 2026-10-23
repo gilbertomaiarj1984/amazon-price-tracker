@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Rastreador de preços
 // @namespace    price-tracker-local
-// @version      3.0.0
+// @version      3.0.1
 // @description  Botão "Rastrear" na página do produto e seleção de vários itens na busca. Janela com preços, gráfico e alvo editável (com token); copia links para o bot do Telegram.
 // @match        https://www.amazon.com.br/*
 // @grant        GM_setClipboard
@@ -309,7 +309,10 @@
         onload: (r) => {
           let j = null;
           try { j = JSON.parse(r.responseText); } catch {}
-          if (r.status === 401) return reject(new Error("Token recusado. Troque no menu do Tampermonkey."));
+          if (r.status === 401) {
+            const caddy = /www-authenticate/i.test(r.responseHeaders || "") || !j;
+            return reject(new Error(caddy ? "O Caddy ainda pede senha neste caminho: ajuste a linha @selo do Caddyfile (docs/userscript.md)." : "Token recusado pelo app: confira o valor no menu do Tampermonkey."));
+          }
           if (r.status === 429) return reject(new Error("Muitas tentativas. Espere um pouco."));
           if (r.status === 200 || (r.status === 404 && j && j.rastreado === false)) return resolve(j);
           reject(new Error((j && j.erro) || `Erro ${r.status}`));
