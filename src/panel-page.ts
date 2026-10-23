@@ -93,6 +93,7 @@ const motivo=m=>MOTIVOS[m]||m||'motivo desconhecido';
 const lido=i=>i.linhas.amazon.coletas||(i.ultimaColeta&&i.ultimaColeta.ok)?'ok':i.ultimaColeta?'erro':'nunca';
 /* preço exibido: o da Amazon, ou o do melhor terceiro quando ela não vende */
 const ap=i=>{const a=i.linhas.amazon,t=i.linhas.terceiros;return a.atual!=null?a.atual:(t.automatico?t.atual:null)};
+function atualiz(i){const u=i.ultimaColeta;if(!u)return '<span class="mut">Ainda não atualizado</span>';return '<span class="mut" title="'+esc(dt(u.em))+'">Atualizado '+dt(u.em)+' ('+ago(u.em)+')'+(u.ok?'':' · última tentativa falhou')+'</span>'}
 function status(i){const a=i.linhas.amazon,v=ap(i);
  if(i.pausado)return{k:'paused',t:'Pausado'};
  if(!a.coletas&&!i.ultimaColeta)return{k:'',t:'Aguardando 1ª coleta'};
@@ -181,7 +182,7 @@ function renderEsq(){let h='',add='',grp='';
   const alv=S.edit?'<div class="alv" data-asin="'+esc(i.asin)+'"><span class="mut">Alvo</span><input type="text" class="val" inputmode="decimal" placeholder="ex.: 449" value="'+(al!=null?String(al).replace('.',','):'')+'" aria-label="Alvo da Amazon do item '+i.num+'"><button type="button" class="btn sm pri" data-cs="1">Definir</button>'+chips+(al!=null?'<button type="button" class="btn sm" data-cx="1" title="Remover alvo">×</button>':'')+'</div>':'';
   return '<div class="itw'+(!(i.falhasSeguidas>0)&&{below:' in',warn:' warn',hot:' hot'}[st.k]||'')+(i.asin===S.sel?' sel':'')+'"'+(S.edit?' draggable="true" data-dr="'+esc(i.asin)+'"':'')+'><button type="button" class="item" data-asin="'+esc(i.asin)+'" aria-pressed="'+(i.asin===S.sel)+'">'+foto(i)
    +'<span class="ti"><b>'+esc(i.titulo||i.asin)+'</b></span><span class="pr num">'+(ap(i)!=null?brl(ap(i)):'—')+'</span>'
-   +'<span class="stt">'+pill(st)+tags+'</span>'+degraus(i.mini,80,26,cor)+'</button>'+alv+'</div>'};
+   +'<span class="stt">'+pill(st)+tags+(i.ultimaColeta?'<span class="mut" title="Última atualização">↻ '+ago(i.ultimaColeta.em)+'</span>':'')+'</span>'+degraus(i.mini,80,26,cor)+'</button>'+alv+'</div>'};
  const vistos=new Set();
  for(const i of vis){
   if(i.grupoId==null||!gnome(i.grupoId)){h+=card(i);continue}
@@ -284,7 +285,7 @@ const libera=d=>{const t=d.consultaLiberadaEm?new Date(d.consultaLiberadaEm).get
 function renderDir(){if(S.gsel!=null)return renderGrupo();const d=S.det,it=S.itens.find(x=>x.asin===S.sel);
  if(!d||!it){$('#dir').innerHTML='<div class="vazio">'+(S.itens.length?'Selecione um item.':'Nenhum item selecionado.')+'</div>';return}
  const L=d.linhas,st=status(it),url=d.url&&d.url.startsWith('https:'+'//www.amazon.com.br/')?d.url:null;
- let h='<div class="dh"><div style="display:flex;gap:14px;min-width:0">'+foto(it)+'<div><h2>'+esc(d.titulo||d.asin)+'</h2><div class="meta"><span class="mono">#'+d.num+' · '+esc(d.asin)+'</span>'+pill(st)+(d.silenciadoAte?'<span class="pill">alertas silenciados até '+esc(new Date(d.silenciadoAte).toLocaleString('pt-BR'))+'</span>':'')+'</div></div></div>';
+ let h='<div class="dh"><div style="display:flex;gap:14px;min-width:0">'+foto(it)+'<div><h2>'+esc(d.titulo||d.asin)+'</h2><div class="meta"><span class="mono">#'+d.num+' · '+esc(d.asin)+'</span>'+pill(st)+atualiz(it)+(d.silenciadoAte?'<span class="pill">alertas silenciados até '+esc(new Date(d.silenciadoAte).toLocaleString('pt-BR'))+'</span>':'')+'</div></div></div>';
  h+='<div class="act">'+(url?'<a class="btn sm" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Abrir na Amazon</a>':'')+(S.edit?'<button class="btn sm" data-q="1"'+(libera(d)?' disabled':'')+'>'+(libera(d)?'Consultar em '+libera(d)+' min':'Consultar agora')+'</button><button class="btn sm" data-p="1">'+(d.pausado?'Retomar':'Pausar')+'</button><button class="btn sm" data-s="1">'+(d.silenciadoAte?'Reativar alertas':'Silenciar 24 h')+'</button><button class="btn sm bad" data-r="1">Remover</button>':'')+'</div></div>';
  h+='<div class="row" style="margin-top:12px"><span class="mut">Grupo</span>'+(S.edit?'<select id="dg" aria-label="Grupo do item"><option value="">Sem grupo</option>'+S.grupos.map(g=>'<option value="'+g.id+'"'+(g.id===it.grupoId?' selected':'')+'>'+esc(g.nome)+'</option>').join('')+'<option value="new">+ Novo grupo…</option></select>':'<b>'+esc(gnome(it.grupoId)||'—')+'</b>')+(it.grupoId!=null?'<button type="button" class="btn sm" data-vg="1">Ver grupo</button>':'')+'</div>';
  h+='<div class="tw"><table><tr><th>Linha de preço</th><th class="n">Agora</th><th class="n">Alvo</th><th class="n">Mín 30 d</th><th class="n">Máx 30 d</th><th class="n">Variação</th>'+(S.edit?'<th>Coleta</th>':'')+'</tr>';
