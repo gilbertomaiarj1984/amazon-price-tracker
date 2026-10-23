@@ -199,9 +199,21 @@ export class Bot {
     return this.d.send(msg);
   }
 
+  /** Botões do aviso diário: Rastrear (cadastra e agrupa com o original) ou Recusar. */
+  private async sugestao(aceitar: boolean, id: number): Promise<void> {
+    if (!aceitar) return this.d.send(this.act.recusarSugestao(id) ? "Ok, não sugiro esse de novo." : "Essa sugestão já foi tratada.");
+    const r = await this.act.aceitarSugestao(id);
+    if (!r.ok) return this.d.send(r.erro === "existente" ? "Esse item já está rastreado." : "Essa sugestão não está mais disponível.");
+    const n = this.store.numberOf(r.product.id);
+    return this.d.send(
+      `Item #${n} cadastrado e agrupado com o original${r.alvoHerdado != null ? ` (alvo ${fmt.money(r.alvoHerdado)} herdado)` : ""}.${r.leitura ? "" : " Não consegui ler agora; entra na próxima rodada."}`,
+    );
+  }
+
   async handleCallback(data: string): Promise<void> {
     const [kind = "", a, b] = data.split(":");
     if (kind === "cn") return this.d.send("Ok, nada foi removido.");
+    if (kind === "sga" || kind === "sgr") return this.sugestao(kind === "sga", Number(a));
     const p = a ? this.store.getById(Number(a)) : null;
     if (!p) return this.d.send("Esse item não existe mais.");
     switch (kind) {

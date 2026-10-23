@@ -241,6 +241,16 @@ export function panelSelo(store: Store, p: Product, now: Date): Selo {
   return { rastreado: true, linha, atual: l.atual, min: l.min, max: l.max, media, coletas: l.coletas, veredito, atualizadoEm: avg.t, serie: downsample(rows, SERIE_MAX) };
 }
 
+/** Sugestões pendentes da varredura diária, com o item de origem. */
+export function panelSugestoes(store: Store) {
+  return store.listSugestoes().flatMap((s) => {
+    const o = store.getById(s.origemId);
+    return o
+      ? [{ id: s.id, asin: s.asin, titulo: s.titulo, formato: s.formato, formatoOrigem: s.formatoOrigem, certeza: s.certeza, preco: s.preco, vendedor: s.vendedor, criadoEm: s.criadoEm, origem: { asin: o.asin, titulo: o.titulo, num: store.numberOf(o.id) } }]
+      : [];
+  });
+}
+
 function tokenOk(given: string | null, expected: string): boolean {
   const a = Buffer.from(given ?? "");
   const b = Buffer.from(expected);
@@ -450,7 +460,7 @@ export function panelHandler(d: PanelDeps): (req: Request) => Promise<Response> 
     const url = new URL(req.url);
     const path = url.pathname;
     if (path === "/") return new Response(PANEL_HTML, { headers: { "content-type": "text/html; charset=utf-8" } });
-    if (path === "/api/itens") return json({ saude: panelHealth(d.store, d.now(), d.intervalMin), itens: panelItems(d.store, d.now()), grupos: d.store.listGrupos().map((g) => ({ id: g.id, nome: g.nome })), edicao: act != null });
+    if (path === "/api/itens") return json({ saude: panelHealth(d.store, d.now(), d.intervalMin), itens: panelItems(d.store, d.now()), grupos: d.store.listGrupos().map((g) => ({ id: g.id, nome: g.nome })), sugestoes: panelSugestoes(d.store), edicao: act != null });
     if (path.startsWith("/api/selo/")) {
       const m = /^\/api\/selo\/([A-Z0-9]{10})$/.exec(path);
       if (!d.token) return json({ erro: "não encontrado" }, 404);
@@ -479,9 +489,18 @@ export function panelHandler(d: PanelDeps): (req: Request) => Promise<Response> 
     // Só estas rotas escrevem. /api/selo/* e o token do selo nunca chegam aqui.
     const item = /^\/api\/itens\/([A-Z0-9]{10})(?:\/(alvo|pausa|silencio|linhas|consultar|grupo))?$/.exec(path);
     const grp = /^\/api\/grupos(?:\/(\d{1,9}))?$/.exec(path);
-    if (!act || (path !== "/api/itens" && path !== "/api/importar" && !item && !grp)) return json({ erro: "método não permitido" }, 405);
+    const sug = /^\/api\/sugestoes\/(\d{1,9})\/(aceitar|recusar)$/.exec(path);
+    if (!act || (path !== "/api/itens" && path !== "/api/importar" && !item && !grp && !sug)) return json({ erro: "método não permitido" }, 405);
     try {
       checkSameOrigin(req, url);
+      if (sug) {
+        if (req.method !== "POST") return json({ erro: "método não permitido" }, 405);
+        const id = Number(sug[1]);
+        if (sug[2] === "recusar") return act.recusarSugestao(id) ? json({ recusada: true }) : json({ erro: "Essa sugestão já foi tratada." }, 409);
+        const r = await act.aceitarSugestao(id);
+        if (!r.ok) return json({ erro: r.erro === "existente" ? "Esse item já está rastreado." : "Essa sugestão não está mais disponível." }, 409);
+        return json({ aceita: true, asin: r.product.asin, alvoHerdado: r.alvoHerdado, leitura: r.leitura });
+      }
       if (grp) return await grupoWrite(d, req.method, grp[1] ? Number(grp[1]) : null, req);
       if (path === "/api/importar") {
         if (req.method !== "POST") return json({ erro: "método não permitido" }, 405);

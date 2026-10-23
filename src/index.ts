@@ -1,7 +1,8 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { resolveAsin } from "./amazon/asin.ts";
-import { fetchHtml, jitterMs } from "./amazon/fetch.ts";
+import { fetchHtml, jitterMs, productUrl } from "./amazon/fetch.ts";
+import { esc, money } from "./format.ts";
 import { Bot } from "./bot.ts";
 import { collectOne, realDeps } from "./collector.ts";
 import { loadConfig } from "./config.ts";
@@ -138,8 +139,16 @@ if (cfg.sugestoes) {
       maxCandidatos: sg.maxCandidatos,
     });
     if (r.novas > 0) {
-      const n = store.listSugestoes().length;
-      await send(`<b>${r.novas} nova(s) sugestão(ões)</b> de item vendido pela Amazon para itens que ela não vende. ${n} pendente(s) para revisar${cfg.panel ? " no painel (aba Sugestões)" : ""}.`).catch((e) => log(`aviso de sugestões não enviado: ${(e as Error).message}`));
+      const pend = store.listSugestoes();
+      await send(`<b>${r.novas} nova(s) sugestão(ões)</b> de item vendido e entregue pela Amazon para itens que ela não vende. ${pend.length} pendente(s)${cfg.panel ? "; também aparecem no painel (Sugestões)" : ""}.`).catch((e) => log(`aviso de sugestões não enviado: ${(e as Error).message}`));
+      for (const s of pend.slice(-3)) {
+        const o = store.getById(s.origemId);
+        const cert = s.certeza === "baixa" ? "\nOutro formato: confira se é o mesmo produto." : "";
+        await send(
+          `<b>${esc(s.titulo ?? s.asin)}</b>\n${money(s.preco)} · ${esc(s.vendedor ?? "Amazon")}${s.formato ? ` · ${esc(s.formato)}` : ""}\nPara o item #${o ? store.numberOf(o.id) : "?"}.${cert}`,
+          [[{ text: "Abrir na Amazon", url: productUrl(s.asin) }], [{ text: "Rastrear", callback_data: `sga:${s.id}` }, { text: "Recusar", callback_data: `sgr:${s.id}` }]],
+        ).catch((e) => log(`sugestão não enviada: ${(e as Error).message}`));
+      }
     }
     if (r.parou) await send("A varredura de sugestões parou: a Amazon pediu captcha. Tento de novo amanhã.").catch(() => undefined);
   };
