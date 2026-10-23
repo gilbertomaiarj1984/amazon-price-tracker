@@ -1,5 +1,6 @@
-# Projeto isolado: nome, rede e volume próprios, nenhuma porta publicada, nenhum volume
-# ou rede compartilhados com outros projetos do servidor.
+# Projeto isolado: nome e volume próprios, nenhuma porta publicada. Única exceção de rede:
+# a rede externa `proxy`, a mesma do AgendaBoa e do pdf-unite, para o Caddy alcançar o painel
+# (docs/painel.md). O container não tem `ports:`; só o Caddy (com login) expõe o painel.
 name: price-tracker
 
 services:
@@ -8,6 +9,12 @@ services:
     image: price-tracker:local
     restart: unless-stopped
     env_file: .env
+    environment:
+      PANEL_PORT: "8787"
+      PANEL_HOST: "0.0.0.0"
+    networks:
+      - default
+      - proxy
     volumes:
       - tracker_data:/data
     mem_limit: 128m
@@ -21,6 +28,10 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+networks:
+  proxy:
+    external: true
 
 volumes:
   tracker_data:
