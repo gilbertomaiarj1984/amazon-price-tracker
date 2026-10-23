@@ -1,3 +1,5 @@
+import { ULTIMO_PR } from "./versao.ts";
+
 /** Página única do painel: HTML, CSS e JS inline, sem dependências nem recursos externos. */
 export const PANEL_HTML = `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -9,7 +11,7 @@ export const PANEL_HTML = `<!doctype html>
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
 button,input{font:inherit;color:inherit}button{cursor:pointer}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-main{max-width:1240px;margin:0 auto;padding:20px 16px 48px}
+main{max-width:1240px;margin:0 auto;padding:12px 16px 48px}
 h1{font-size:22px;margin:0 0 14px;letter-spacing:-.01em}
 .num,.preco{font-variant-numeric:tabular-nums}.mut{color:var(--mut);font-size:13px}.mono{font-family:ui-monospace,Menlo,monospace;font-size:12px}
 .cd{background:var(--sf);border:1px solid var(--bd);border-radius:12px}
@@ -52,16 +54,17 @@ textarea{width:100%;resize:vertical;padding:8px}input.val{width:96px;text-align:
 .sh{font-size:14px;font-weight:700;margin:22px 0 0}
 .cp{padding:12px;margin-bottom:12px}.cp h3{font-size:15px;margin:0 0 8px}
 .row{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin:6px 0}
-#filtros{display:grid;gap:8px}#filtros .row{margin:0}#filtros input[type=text]{min-width:0}#filtros select{border:1px solid var(--bd);border-radius:6px;background:var(--sf);color:var(--fg);padding:5px 6px;min-width:0;max-width:100%}#filtros .val{width:84px}
+#filtros{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:10px 14px;margin-bottom:16px}#filtros .row{margin:0;flex-wrap:nowrap}#filtros .row.q{flex:1 1 240px}#filtros .row.q input{flex:1}#filtros #fcount{margin-left:auto;white-space:nowrap}#filtros input[type=text]{min-width:0}#filtros select{border:1px solid var(--bd);border-radius:6px;background:var(--sf);color:var(--fg);padding:5px 6px;min-width:0;max-width:100%}#filtros .val{width:84px}
 #aviso{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);max-width:90%;padding:10px 14px;border-radius:8px;background:var(--fg);color:var(--sf);font-size:14px;display:none;z-index:9}
 #aviso.bad{background:var(--bad);color:#fff}
 .vazio{padding:40px 16px;text-align:center;color:var(--mut)}
 .gs{padding:10px 12px}.gs .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.gs .chip{border:1px dashed var(--axis);background:var(--sf2);border-radius:999px;padding:3px 10px;font-size:13px;font-weight:600;color:var(--fg2)}.gs .chip.on{border-style:solid;border-color:var(--acc);color:var(--acc)}
 .over{outline:2px dashed var(--acc);outline-offset:2px;background:var(--accsoft)}.itw.drag{opacity:.45}.itw[draggable=true] .item{cursor:grab}
-@media(min-width:901px){html,body{height:100%}main{height:100vh;display:flex;flex-direction:column;padding-bottom:16px}.split{flex:1;min-height:0;align-items:stretch;grid-template-rows:minmax(0,1fr)}.det{min-height:0;overflow-y:auto;overscroll-behavior:contain}.esq{display:flex;flex-direction:column;min-height:0}.esq>#addbox,.esq>#filtros{flex:none}#addbox{max-height:30vh;overflow-y:auto}#lst{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:4px}}
+@media(min-width:901px){html,body{height:100%}main{height:100vh;display:flex;flex-direction:column;padding-bottom:12px}.split{flex:1;min-height:0;align-items:stretch;grid-template-rows:minmax(0,1fr)}.det{min-height:0;overflow-y:auto;overscroll-behavior:contain}.esq{display:flex;flex-direction:column;min-height:0;background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:8px}.esq>#addbox{flex:none;max-height:26vh;overflow-y:auto;padding:0 4px 4px}.gs{max-height:96px;overflow-y:auto}#lst{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:4px}}
 @media(max-width:900px){.split{grid-template-columns:minmax(0,1fr)}}
-</style></head><body><main><h1>Rastreador de preços</h1><div id="saude" class="cd saude">Carregando…</div>
-<div class="split"><div class="esq" id="esq"><div id="addbox"></div><div class="cd cp" id="filtros"></div><div id="lst"></div></div><div class="cd det" id="dir"><div class="vazio">Carregando…</div></div></div></main>
+</style></head><body><main><div id="saude" class="cd saude">Carregando…</div>
+<div class="cd cp" id="filtros"></div>
+<div class="split"><div class="esq" id="esq"><div id="addbox"></div><div id="lst"></div></div><div class="cd det" id="dir"><div class="vazio">Carregando…</div></div></div></main>
 <script>
 const $=s=>document.querySelector(s);
 const brl=n=>n==null?'—':n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
@@ -105,7 +108,7 @@ function degraus(pts,w,h,cor){if(pts.length<2)return '<svg class="sp" width="'+w
 function renderSaude(){const s=S.saude;if(!s)return;
  const abaixo=S.itens.filter(i=>status(i).k==='below').length;
  const prox=s.ultimaRodada?hhmm(Date.parse(s.ultimaRodada)+s.intervaloMin*60000):null;
- $('#saude').innerHTML='<span><b class="st-'+s.status+'">'+ST[s.status]+'</b></span><span><b>Última coleta</b> '+(s.ultimaRodada?dt(s.ultimaRodada)+' ('+ago(s.ultimaRodada)+')':'nunca')+'</span>'+(prox?'<span><b>Próxima</b> ~'+prox+'</span>':'')+'<span>a cada '+s.intervaloMin+' min</span>'
+ $('#saude').innerHTML='<span class="pill" title="Último PR no ar">PR #${ULTIMO_PR}</span><span><b class="st-'+s.status+'">'+ST[s.status]+'</b></span><span><b>Última coleta</b> '+(s.ultimaRodada?dt(s.ultimaRodada)+' ('+ago(s.ultimaRodada)+')':'nunca')+'</span>'+(prox?'<span><b>Próxima</b> ~'+prox+'</span>':'')+'<span>a cada '+s.intervaloMin+' min</span>'
   +(s.rodadasFalhasSeguidas>0?'<span class="pill fail">! '+s.rodadasFalhasSeguidas+' rodadas seguidas com falha</span>':'')
   +'<span><b>Itens</b> '+s.itens+(s.pausados?' · '+s.pausados+' pausados':'')+(s.comFalhas?' · <span style="color:var(--bad)">'+s.comFalhas+' com falha</span>':'')+' · '+abaixo+' dentro do alvo</span>'}
 
@@ -140,7 +143,7 @@ function visiveis(){const f=ORD[F.ord]||ORD.num,sg=F.dir==='desc'?-1:1;
   const c=typeof x.k==='string'?x.k.localeCompare(y.k,'pt-BR'):x.k-y.k;return c?c*sg:x.i.num-y.i.num}).map(o=>o.i)}
 function initFiltros(){const el=$('#filtros');
  const opt=(o,v)=>Object.entries(o).map(([k,l])=>'<option value="'+k+'"'+(k===v?' selected':'')+'>'+esc(Array.isArray(l)?l[0]:l)+'</option>').join('');
- el.innerHTML='<div class="row"><input type="text" id="fq" placeholder="Buscar por título ou ASIN" style="flex:1" value="'+esc(F.q)+'" aria-label="Buscar"></div>'
+ el.innerHTML='<div class="row q"><input type="text" id="fq" placeholder="Buscar por título ou ASIN" style="flex:1" value="'+esc(F.q)+'" aria-label="Buscar"></div>'
   +'<div class="row"><select id="fst" aria-label="Status">'+opt(FILTROS,F.st)+'</select><select id="fgr" aria-label="Grupo">'+opt(Object.assign({'':'Todos os grupos',none:'Sem grupo'},gmap()),F.gr)+'</select><select id="fln" aria-label="Linha de preço">'+opt({'':'Qualquer linha',terceiros:'Com Terceiros ligada',usado:'Com Usado ligada'},F.ln)+'</select></div>'
   +'<div class="row"><span class="mut">Preço</span><input type="text" class="val" id="fmin" inputmode="decimal" placeholder="mín" value="'+esc(F.min)+'" aria-label="Preço mínimo"><input type="text" class="val" id="fmax" inputmode="decimal" placeholder="máx" value="'+esc(F.max)+'" aria-label="Preço máximo"></div>'
   +'<div class="row"><select id="ford" aria-label="Ordenar por">'+opt(ORD,F.ord)+'</select><button type="button" class="btn sm" id="fdir" title="Inverter ordem">'+(F.dir==='desc'?'↓ Decrescente':'↑ Crescente')+'</button><button type="button" class="btn sm" id="flimpa">Limpar</button></div>'
