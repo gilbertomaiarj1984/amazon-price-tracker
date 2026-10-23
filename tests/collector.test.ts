@@ -187,10 +187,12 @@ describe("Amazon sem oferta: melhor terceiro", () => {
     expect(store.lineStats(p.id, "amazon").coletas).toBe(0);
     expect(store.lastPoint(p.id, "terceiros")?.preco).toBe(379);
     const v = buildView(store, store.getById(p.id)!, net.deps.now());
-    expect(v.linhas.amazon).toMatchObject({ atual: 379, vendedor: "TechBras Store", terceiro: { envio: "terceiro" } });
-    expect(v.linhas.terceiros.ligada).toBe(false);
+    // o preço do terceiro fica na linha Terceiros (mesmo desligada); a linha Amazon continua sem oferta
+    expect(v.linhas.amazon.atual).toBeNull();
+    expect(v.linhas.terceiros).toMatchObject({ ligada: false, atual: 379, vendedor: "TechBras Store", automatico: { envio: "terceiro" } });
     const card = fmt.card(v);
-    expect(card).toContain("Melhor terceiro");
+    expect(card).toContain("Amazon  sem oferta agora");
+    expect(card).toContain("melhor terceiro");
     expect(card).toContain("TechBras Store");
     expect(card).toContain("não é da Amazon");
   });
@@ -214,7 +216,7 @@ describe("Amazon sem oferta: melhor terceiro", () => {
     const back = await collectOne(store, p, net.deps);
     expect(back.ok && back.alertas.map((x) => x.evento.tipo)).toContain("voltou");
     expect(store.getFallback(p.id)).toBeNull();
-    expect(buildView(store, store.getById(p.id)!, net.deps.now()).linhas.amazon.terceiro).toBeUndefined();
+    expect(buildView(store, store.getById(p.id)!, net.deps.now()).linhas.terceiros.automatico).toBeUndefined();
   });
 
   test("sem nenhuma oferta: continua 'sem oferta', sem fallback", async () => {

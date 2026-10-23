@@ -25,19 +25,17 @@ export function card(v: ProductView): string {
     `<b>${title(v)}</b>`,
     `<code>#${v.num} · ${v.asin}</code>`,
     "",
-    a.terceiro
-      ? `<b>Melhor terceiro  ${money(a.atual)}</b>\n${terceiroTxt(a.vendedor, a.terceiro.envio)}\n<i>A Amazon não vende este item agora; este preço não é da Amazon.</i>`
-      : a.atual != null
-        ? `<b>Amazon  ${money(a.atual)}</b>`
-        : "<b>Amazon  sem oferta agora</b>",
+    a.atual != null ? `<b>Amazon  ${money(a.atual)}</b>` : "<b>Amazon  sem oferta agora</b>",
   ];
   for (const k of ["terceiros", "usado"] as const) {
     const l = v.linhas[k];
-    if (!l.ligada) lines.push(`${LINE_NAMES[k]}  <i>desligada</i>`);
+    if (l.automatico && a.atual == null)
+      lines.push(`<b>${LINE_NAMES[k]}  ${money(l.atual)}</b>${l.ligada ? "" : " <i>(melhor terceiro, automático)</i>"}\n${terceiroTxt(l.vendedor, l.automatico.envio)}\n<i>A Amazon não vende este item agora; este preço não é da Amazon.</i>`);
+    else if (!l.ligada) lines.push(`${LINE_NAMES[k]}  <i>desligada</i>`);
     else if (l.atual == null) lines.push(`${LINE_NAMES[k]}  sem oferta`);
     else lines.push(`${LINE_NAMES[k]}  ${money(l.atual)}${l.vendedor ? ` · ${esc(l.vendedor)}` : ""}`);
   }
-  lines.push("", `Alvo ${a.terceiro ? "(vale para o terceiro enquanto a Amazon não vende)" : "Amazon"}: ${a.alvo != null ? `<b>${money(a.alvo)}</b>` : "não definido"}`);
+  lines.push("", `Alvo ${v.linhas.terceiros.automatico && a.atual == null ? "Amazon (vale para o terceiro enquanto ela não vende)" : "Amazon"}: ${a.alvo != null ? `<b>${money(a.alvo)}</b>` : "não definido"}`);
   if (v.pausado) lines.push("<i>Pausado</i>");
   return lines.join("\n");
 }
