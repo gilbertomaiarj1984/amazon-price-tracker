@@ -56,6 +56,10 @@ Ele faz ~50 requisições espaçadas (2 a 5 s), imprime a taxa de sucesso por ti
 
 O endereço do painel "Todas as ofertas" (`offersUrl` em `src/amazon/fetch.ts`) também precisa ser confirmado nesse teste.
 
+## Isolamento
+
+O app roda sozinho e não toca em nenhum outro projeto do mesmo servidor: diretório, projeto Compose, rede, volume, bot do Telegram e secrets próprios, sem portas publicadas e sem depender de Caddy, Postgres ou do Docker socket. Detalhes em `CLAUDE.md`.
+
 ## Aviso
 
 A Amazon proíbe coleta automática nos termos de uso. O projeto foi pensado para uso pessoal e baixo volume (dezenas de produtos, uma requisição por produto a cada 30 minutos). O efeito prático esperado é bloqueio de IP, mas o risco é seu.
