@@ -364,3 +364,10 @@ describe("cards com foto", () => {
     expect(((await (await get("/api/itens")).json()) as any).itens[0].imagem).toBeNull();
   });
 });
+
+test("card cai para o ícone quando a foto não carrega", async () => {
+  const html = await (await get("/")).text();
+  expect(html).toContain("onerror=");
+  const js = html.split("<script>")[1]!.split("</script>")[0]!;
+  expect(() => new Function(js)).not.toThrow();
+});

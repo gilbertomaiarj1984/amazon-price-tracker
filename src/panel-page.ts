@@ -86,7 +86,7 @@ function status(i){const a=i.linhas.amazon;
  const p=(a.atual-a.alvo)/a.alvo*100;return{k:p>LIMITE_LARANJA?'hot':'warn',t:'▲ '+p.toFixed(1).replace('.',',')+'% acima do alvo'}}
 const LIMITE_LARANJA=20;/* % acima do alvo, (atual − alvo) / alvo: até aqui laranja, acima disso vermelho */
 const pill=s=>'<span class="pill '+s.k+'">'+esc(s.t)+'</span>';
-function foto(i,cls){return '<div class="foto">'+(i.imagem?'<img src="'+esc(i.imagem)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'<span>🛒</span>')+'</div>'}
+function foto(i,cls){return '<div class="foto">'+(i.imagem?'<img src="'+esc(i.imagem)+'" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.textContent=\\'🛒\\'">':'<span>🛒</span>')+'</div>'}
 function degraus(pts,w,h,cor){if(pts.length<2)return '<svg class="sp" width="'+w+'" height="'+h+'"></svg>';
  const xs=pts.map(p=>Date.parse(p.t)),ys=pts.map(p=>p.v),x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
  const X=t=>(2+(t-x0)/((x1-x0)||1)*(w-4)).toFixed(1),Y=v=>(3+(y1-v)/((y1-y0)||1)*(h-6)).toFixed(1);
