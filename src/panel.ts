@@ -1,6 +1,6 @@
 import { IMAGE_HOST_RE } from "./amazon/parse.ts";
 import { parseKeepaList, MAX_IMPORT } from "./keepa.ts";
-import { Actions, MAX_BATCH, RESOLVE_ERRORS, extractLinks, mutedUntil } from "./actions.ts";
+import { Actions, MAX_BATCH, consultaLiberadaEm, RESOLVE_ERRORS, extractLinks, mutedUntil } from "./actions.ts";
 import type { ActionDeps } from "./actions.ts";
 import { productUrl } from "./amazon/fetch.ts";
 import type { Product, Store } from "./db.ts";
@@ -128,6 +128,7 @@ export function panelDetail(store: Store, p: Product, now: Date, days: number) {
     titulo: p.titulo,
     pausado: p.pausado,
     silenciadoAte: mutedUntil(store, p.id, now),
+    consultaLiberadaEm: consultaLiberadaEm(store, p.id, now),
     url: productUrl(p.asin),
     dias: days,
     desde,
@@ -328,6 +329,12 @@ async function itemWrite(d: PanelDeps, act: Actions, method: string, p: Product,
     act.remove(p);
     return json({ removido: true });
   }
+  if (method === "POST" && sub === "consultar") {
+    const r = await act.consultar(p);
+    if (!r.ok && r.erro === "espera") return json({ erro: "Esse item foi consultado há pouco. Tente de novo em alguns minutos.", liberadaEm: r.liberadaEm }, 429);
+    const fresh = d.store.getById(p.id)!;
+    return json({ ...panelDetail(d.store, fresh, d.now(), 14), consulta: r.ok ? "ok" : "falhou", detalhe: r.ok ? null : r.detalhe });
+  }
   if (method !== "PUT") return json({ erro: "método não permitido" }, 405);
   const body = await readBody(req);
   switch (sub) {
@@ -382,7 +389,7 @@ export function panelHandler(d: PanelDeps): (req: Request) => Promise<Response> 
     const url = new URL(req.url);
     const path = url.pathname;
     // Só estas rotas escrevem. /api/selo/* e o token do selo nunca chegam aqui.
-    const item = /^\/api\/itens\/([A-Z0-9]{10})(?:\/(alvo|pausa|silencio|linhas))?$/.exec(path);
+    const item = /^\/api\/itens\/([A-Z0-9]{10})(?:\/(alvo|pausa|silencio|linhas|consultar))?$/.exec(path);
     if (!act || (path !== "/api/itens" && path !== "/api/importar" && !item)) return json({ erro: "método não permitido" }, 405);
     try {
       checkSameOrigin(req, url);

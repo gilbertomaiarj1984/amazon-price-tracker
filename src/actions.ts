@@ -14,6 +14,21 @@ export interface ActionDeps {
 export const MAX_BATCH = 20;
 export const MUTE_MS = 24 * 3_600_000;
 
+/** Intervalo mínimo entre duas consultas manuais do mesmo item, para não irritar a Amazon. */
+export const CONSULTA_COOLDOWN_MS = 5 * 60_000;
+
+export const consultaKey = (id: number): string => `consulta:${id}`;
+
+/** Quando o botão "Consultar agora" do item volta a valer, se ainda está em espera. */
+export function consultaLiberadaEm(store: Store, id: number, now: Date): string | null {
+  const last = store.getMeta(consultaKey(id));
+  if (last == null) return null;
+  const ate = new Date(last).getTime() + CONSULTA_COOLDOWN_MS;
+  return Number.isFinite(ate) && ate > now.getTime() ? new Date(ate).toISOString() : null;
+}
+
+export type ConsultaResult = { ok: true } | { ok: false; erro: "espera"; liberadaEm: string } | { ok: false; erro: "leitura"; detalhe: string | null };
+
 export const muteKey = (id: number): string => `mute:${id}`;
 
 /** Fim do silêncio de alertas do item, se ainda vale. */
@@ -101,6 +116,17 @@ export class Actions {
 
   setLinha(p: Product, k: "terceiros" | "usado", on: boolean): void {
     this.store.setLinhaOn(p.id, k, on);
+  }
+
+  /** Consulta manual: mesmo caminho da rodada agendada (fila única, grava histórico e alertas), com espera entre consultas do item. */
+  async consultar(p: Product): Promise<ConsultaResult> {
+    const now = this.d.now();
+    const liberadaEm = consultaLiberadaEm(this.store, p.id, now);
+    if (liberadaEm) return { ok: false, erro: "espera", liberadaEm };
+    // Marca antes de ler: cliques repetidos não furam a espera e uma falha também conta.
+    this.store.setMeta(consultaKey(p.id), now.toISOString());
+    const r = await this.collectNow(p);
+    return r.ok ? { ok: true } : { ok: false, erro: "leitura", detalhe: r.detalhe };
   }
 
   /** Lê o item agora, depois de ligar uma linha. */

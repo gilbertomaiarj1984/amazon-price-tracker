@@ -141,6 +141,22 @@ describe("comandos", () => {
     await b.handleText("/item 99");
     expect(last().html).toContain("Não achei");
   });
+  test("/item N tem o botão Consultar agora; o clique lê, mostra o card e respeita a espera", async () => {
+    await bot.handleText(LINK);
+    await bot.handleText("/item 1");
+    expect(cbs(last())).toContain("q:1");
+    sent.length = 0;
+    await bot.handleCallback("q:1");
+    expect(sent[0]!.html).toContain("Consultando #1");
+    expect(last().html).toContain("Heinz Ketchup");
+    const n = net.calls.length;
+    await bot.handleCallback("q:1");
+    expect(last().html).toContain("consultado há pouco");
+    expect(net.calls.length).toBe(n);
+    net.clock.t += 5 * 60_000 + 1;
+    await bot.handleCallback("q:1");
+    expect(net.calls.length).toBeGreaterThan(n);
+  });
   test("/historico", async () => {
     await bot.handleText("/historico 1");
     expect(last().html).toContain("Amazon</b>  R$ 20,10");

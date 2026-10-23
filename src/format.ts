@@ -95,7 +95,7 @@ export function productFailure(v: ProductView, kind: string, n: number): string 
 }
 
 export const HELP = `<b>Comandos</b>
-<code>/item N</code>  card do item com foto e preço
+<code>/item N</code>  card do item com foto, preço e botão Consultar agora
 <code>/historico N</code>  mínimo, máximo e variação
 <code>/linhas N</code>  liga ou desliga Terceiros e Usado
 <code>/alvo N valor</code>  alvo da linha Amazon
