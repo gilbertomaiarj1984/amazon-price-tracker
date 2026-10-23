@@ -91,6 +91,7 @@ async function main() {
   for (let i = 0; i < args.n; i++) {
     const asin = asins[i % asins.length]!;
     const ua = pickUserAgent(i);
+    const firstRow = rows.length;
     try {
       const page = await get(productUrl(asin), { ua }, dryPages[i % dryPages.length]!);
       const kind = detectBlock(page.html, page.status, "product");
@@ -112,8 +113,8 @@ async function main() {
     } catch (e) {
       rows.push({ asin, tipo: "produto", status: 0, bloqueio: "http_error", ms: 0, detalhe: `erro de rede: ${(e as Error).message}` });
     }
-    const last = rows[rows.length - 1]!;
-    console.log(`${String(i + 1).padStart(3)}/${args.n} ${last.tipo.padEnd(7)} ${asin} HTTP ${last.status} ${last.bloqueio} ${last.ms}ms ${last.detalhe}`);
+    for (const r of rows.slice(firstRow))
+      console.log(`${String(i + 1).padStart(3)}/${args.n} ${r.tipo.padEnd(7)} ${asin} HTTP ${r.status} ${r.bloqueio} ${r.ms}ms ${r.detalhe}`);
     if (i < args.n - 1 && !args.dry) await sleep(jitterMs(args.minMs, args.maxMs));
   }
 
