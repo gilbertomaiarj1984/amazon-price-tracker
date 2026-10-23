@@ -162,3 +162,16 @@ describe("detectBlock", () => {
     expect(detectBlock(`<html><body>${"x".repeat(800)}</body></html>`, 200)).toBe("html_inesperado"));
   test("painel de ofertas", () => expect(detectBlock(fx("offers-panel.html"), 200, "offers")).toBe("ok"));
 });
+
+describe("foto do produto", () => {
+  const page = (img: string) => `<html><body><span id="productTitle">X</span>${img}</body></html>`;
+  test("data-old-hires, src e data-a-dynamic-image", () => {
+    expect(parseProductPage(page('<img id="landingImage" data-old-hires="https://m.media-amazon.com/images/I/aaa.jpg" src="data:image/gif;base64,xx">')).imagem).toBe("https://m.media-amazon.com/images/I/aaa.jpg");
+    expect(parseProductPage(page('<img id="landingImage" src="https://m.media-amazon.com/images/I/bbb._AC_SX.jpg">')).imagem).toBe("https://m.media-amazon.com/images/I/bbb._AC_SX.jpg");
+    expect(parseProductPage(page('<img id="landingImage" data-a-dynamic-image=\'{"https://m.media-amazon.com/images/I/ccc.jpg":[500,500]}\'>')).imagem).toBe("https://m.media-amazon.com/images/I/ccc.jpg");
+  });
+  test("recusa host que não é da Amazon e página sem foto", () => {
+    expect(parseProductPage(page('<img id="landingImage" src="https://evil.example/x.jpg">')).imagem).toBeNull();
+    expect(parseProductPage(page("")).imagem).toBeNull();
+  });
+});

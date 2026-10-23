@@ -62,6 +62,7 @@ export interface Product {
   terceirosOn: boolean;
   usadoOn: boolean;
   falhasSeguidas: number;
+  imagem: string | null;
 }
 
 export interface LineStats {
@@ -82,6 +83,7 @@ interface ProductRow {
   terceiros_on: number;
   usado_on: number;
   falhas_seguidas: number;
+  imagem: string | null;
 }
 
 const toProduct = (r: ProductRow): Product => ({
@@ -93,6 +95,7 @@ const toProduct = (r: ProductRow): Product => ({
   terceirosOn: r.terceiros_on === 1,
   usadoOn: r.usado_on === 1,
   falhasSeguidas: r.falhas_seguidas,
+  imagem: r.imagem ?? null,
 });
 
 export class Store {
@@ -102,6 +105,8 @@ export class Store {
     this.db = new Database(path, { create: true });
     this.db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
     this.db.exec(SCHEMA);
+    const cols = this.db.query("PRAGMA table_info(products)").all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === "imagem")) this.db.exec("ALTER TABLE products ADD COLUMN imagem TEXT");
   }
 
   close(): void {
@@ -134,6 +139,10 @@ export class Store {
 
   numberOf(id: number): number {
     return this.list().findIndex((p) => p.id === id) + 1;
+  }
+
+  setImagem(id: number, url: string): void {
+    this.db.query("UPDATE products SET imagem = ? WHERE id = ?").run(url, id);
   }
 
   setTitulo(id: number, titulo: string): void {

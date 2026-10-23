@@ -88,6 +88,7 @@ export async function collectOne(store: Store, product: Product, deps: CollectDe
   store.saveSnapshot(fresh.id, at, [...offers.map((o) => ({ ...o })), ...descartadas.map((o) => ({ ...o, descartada: true }))], points);
   for (const s of nextStates) store.setAlertState(fresh.id, s.linha, s.next);
   if (parsed.titulo && parsed.titulo !== fresh.titulo) store.setTitulo(fresh.id, parsed.titulo);
+  if (parsed.imagem && parsed.imagem !== fresh.imagem) store.setImagem(fresh.id, parsed.imagem);
   store.resetFailures(fresh.id);
   return { ok: true, page: parsed, points, alertas, descartadas: descartadas.length, painel };
 }

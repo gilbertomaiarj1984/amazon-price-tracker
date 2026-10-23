@@ -10,9 +10,15 @@ main{max-width:900px;margin:0 auto;padding:16px}
 h1{font-size:20px;margin:0 0 12px}
 .saude{padding:10px 12px;border-radius:8px;background:var(--card);border:1px solid var(--bd);margin-bottom:16px;font-size:14px}
 .saude b.ok{color:var(--usa)}.saude b.atrasado,.saude b.sem_rodada{color:var(--ter)}.saude b.falhando{color:var(--bad)}
-.item{display:flex;gap:12px;align-items:center;padding:12px;margin-bottom:8px;border:1px solid var(--bd);border-radius:8px;background:var(--card);cursor:pointer}
+.grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.item{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--bd);border-radius:10px;background:var(--card);cursor:pointer}
 .item:hover{border-color:var(--amz)}
-.item .t{flex:1;min-width:0}.item .t div:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .foto{height:150px;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:8px;overflow:hidden}
+.item .foto img{max-width:100%;max-height:100%;object-fit:contain}.item .foto span{font-size:34px;color:#c3c8ce}
+.item .nome{font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.8em}
+.item .big{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;border:1px solid var(--bd);margin-right:4px}.tag.ok{color:var(--usa);border-color:var(--usa)}.tag.bad{color:var(--bad);border-color:var(--bad)}
+.item .mini{display:flex;justify-content:space-between;align-items:flex-end;gap:8px}
 .mut{color:var(--mut);font-size:13px}.preco{font-weight:600;font-variant-numeric:tabular-nums}
 svg{display:block}.back{background:none;border:0;color:var(--amz);cursor:pointer;font-size:15px;padding:0 0 8px}
 .dias button{margin-right:6px;padding:4px 12px;border:1px solid var(--bd);background:var(--card);color:var(--fg);border-radius:14px;cursor:pointer}
@@ -50,8 +56,17 @@ async function lista(){const d=await get('/api/itens'),s=d.saude;
  let h='<div class="saude"><b class="'+s.status+'">'+ST[s.status]+'</b> · última rodada '+ago(s.ultimaRodada)+' (a cada '+s.intervaloMin+' min) · '+s.itens+' itens'+(s.pausados?', '+s.pausados+' pausados':'')+(s.comFalhas?', <span style="color:var(--bad)">'+s.comFalhas+' com falha</span>':'')+'</div>';
  EDIT=!!d.edicao;
  if(EDIT)h+='<div class="card"><h3>Rastrear produtos</h3><textarea id="txt" rows="3" maxlength="4000" placeholder="Cole um ou mais links da Amazon (um por linha, até 20)"></textarea><button class="btn pri" id="add">Rastrear</button><div id="res">'+ult+'</div></div><div class="card"><h3>Importar do Keepa</h3><div class="mut">Em keepa.com/manage use o botão de exportar (CSV) e escolha o arquivo aqui. Só ASINs; o alvo você define depois.</div><input type="file" id="arq" accept=".csv,.txt,text/csv,text/plain"><div id="imp"></div></div>';
- for(const i of d.itens){const l=i.linhas;
-  h+='<div class="item" data-asin="'+esc(i.asin)+'"><div class="t"><div>'+i.num+'. '+esc(i.titulo||i.asin)+(i.pausado?' (pausado)':'')+(i.silenciadoAte?' (alertas silenciados)':'')+'</div><div class="mut">Amazon <span class="preco">'+(l.amazon.atual!=null?brl(l.amazon.atual):'não vende agora')+'</span>'+(l.terceiros.ligada?' · Terceiros <span class="preco">'+brl(l.terceiros.atual)+'</span>':'')+(l.usado.ligada?' · Usado <span class="preco">'+brl(l.usado.atual)+'</span>':'')+(l.amazon.alvo!=null?' · alvo '+brl(l.amazon.alvo):'')+'</div></div>'+spark(i.mini,110,32)+'</div>'}
+ h+='<div class="grade">';
+ for(const i of d.itens){const l=i.linhas,am=l.amazon,alvo=am.alvo,atual=am.atual;
+  const foto=i.imagem?'<img src="'+esc(i.imagem)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'<span>🛒</span>';
+  const tags=(i.pausado?'<span class="tag">pausado</span>':'')+(i.silenciadoAte?'<span class="tag">alertas silenciados</span>':'')+(i.falhasSeguidas>0?'<span class="tag bad">falha na coleta</span>':'')+(atual!=null&&alvo!=null&&atual<=alvo?'<span class="tag ok">dentro do alvo</span>':'');
+  const vr=am.variacao;
+  h+='<div class="item" data-asin="'+esc(i.asin)+'"><div class="foto">'+foto+'</div><div class="nome">'+i.num+'. '+esc(i.titulo||i.asin)+'</div>'
+   +'<div class="mini"><div><div class="big">'+(atual!=null?brl(atual):'<span class="mut" style="font-size:14px;font-weight:400">'+(am.coletas?'Amazon não vende agora':'aguardando 1ª coleta')+'</span>')+'</div>'
+   +'<div class="mut">'+(alvo!=null?'alvo '+brl(alvo):'sem alvo')+(am.min!=null?' · mín 30d '+brl(am.min):'')+(vr!=null?' · '+(vr>0?'+':'')+vr.toFixed(1)+'%':'')+'</div></div>'+spark(i.mini,80,32)+'</div>'
+   +'<div class="mut">'+(l.terceiros.ligada?'Terceiros <span class="preco">'+brl(l.terceiros.atual)+'</span> ':'')+(l.usado.ligada?'Usado <span class="preco">'+brl(l.usado.atual)+'</span> ':'')+(am.coletas?am.coletas+' coletas':'')+'</div>'
+   +(tags?'<div>'+tags+'</div>':'')+'</div>'}
+ h+='</div>';
  if(!d.itens.length)h+='<p class="mut">Nenhum item rastreado. Cole um link da Amazon acima ou no bot do Telegram.</p>';
  v.innerHTML=h;v.querySelectorAll('.item').forEach(e=>e.onclick=()=>detalhe(e.dataset.asin,14));
  if(EDIT){$('#add').onclick=e=>rodar(e.target,adicionar);$('#arq').onchange=e=>rodar(null,()=>importar(e.target));bindPickers(v)}}

@@ -18,6 +18,8 @@ export interface Offer {
 
 export interface ProductPage {
   titulo: string | null;
+  /** Foto principal (host de imagens da Amazon), se a página trouxe. */
+  imagem?: string | null;
   /** Preço do botão "Adicionar ao carrinho", de quem quer que venda. */
   buyBox: number | null;
   buyBoxVendedor: string | null;

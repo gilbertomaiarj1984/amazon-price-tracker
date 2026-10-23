@@ -117,6 +117,21 @@ function isAmazonSeller(name: string | null | undefined): boolean {
   return /^amazon(\.com\.br| global)?$/i.test(name.trim());
 }
 
+export const IMAGE_HOST_RE = /^https:\/\/(m\.media-amazon\.com|images-na\.ssl-images-amazon\.com)\/images\/[\w%./,+-]+$/;
+
+function productImage(root: ReturnType<typeof parse>): string | null {
+  const img = root.querySelector("#landingImage") ?? root.querySelector("#imgBlkFront");
+  if (!img) return null;
+  const dyn = img.getAttribute("data-a-dynamic-image");
+  let first: string | undefined;
+  try {
+    first = dyn ? Object.keys(JSON.parse(dyn) as Record<string, unknown>)[0] : undefined;
+  } catch {
+    first = undefined;
+  }
+  return [img.getAttribute("data-old-hires"), img.getAttribute("src"), first].find((u): u is string => !!u && IMAGE_HOST_RE.test(u)) ?? null;
+}
+
 export function parseProductPage(html: string): ProductPage {
   const root = parse(html);
   // A página real traz ~1 MB de scripts, e alguns ficam dentro de contêineres que o parser lê como texto.
@@ -127,6 +142,7 @@ export function parseProductPage(html: string): ProductPage {
     titulo = t ? t.split(/\s[:|–-]\s/)[0]?.trim() || null : null;
   }
 
+  const imagem = productImage(root);
   const availability = txt(root.querySelector("#availability")).toLowerCase();
   const indisponivel = /indispon[ií]vel/.test(availability);
   let buyBox: number | null = null;
@@ -159,6 +175,7 @@ export function parseProductPage(html: string): ProductPage {
   const opcoes = other ? /(\d+)\s+op[çc][õo]es?/i.exec(other) : null;
   return {
     titulo,
+    imagem,
     buyBox,
     buyBoxVendedor: vendedor,
     vendidoPorAmazon: buyBox != null && isAmazonSeller(vendedor),
