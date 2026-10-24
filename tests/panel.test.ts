@@ -600,4 +600,9 @@ test("gráfico desenha com alvo definido (sem ReferenceError)", async () => {
   };
   expect(() => run(host, d)).not.toThrow();
   expect(host.innerHTML).toContain("Alvo R$ 100");
+  const rz = new Function("host", "d", "S0", `const $=()=>host,S=S0,LK=['amazon','terceiros'],COR={amazon:'#000',terceiros:'#111'},NOME={amazon:'Amazon',terceiros:'Terceiros'},brl=v=>'R$ '+v,dm=()=>'d',dt=()=>'t';${corpo}\ngrafico(d);`);
+  rz(host, d, { dias: 14, hover: null, zoom: [agora - 7200000, agora] });
+  expect(host.innerHTML).toContain("<svg");
+  rz(host, d, { dias: 14, hover: null, zoom: [agora - 20 * 86400000, agora - 19 * 86400000] });
+  expect(host.innerHTML).toContain("neste intervalo");
 });
