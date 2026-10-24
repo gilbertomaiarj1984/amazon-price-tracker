@@ -581,3 +581,23 @@ test("painel tem a aba Resumo geral, somente leitura, com JS válido", async () 
   const corpo = js.split("function renderRes()")[1]!.split("function setHtml")[0]!;
   expect(corpo).not.toMatch(/api\(|get\(|fetch\(/);
 });
+
+test("gráfico desenha com alvo definido (sem ReferenceError)", async () => {
+  const html = await (await get("/")).text();
+  const js = html.split("<script>")[1]!.split("</script>")[0]!;
+  const ini = js.indexOf("const ativa=");
+  const fim = js.indexOf("function tabelaColetas");
+  const host: any = { clientWidth: 800, innerHTML: "", querySelector: () => ({ getBoundingClientRect: () => ({ left: 0 }), set onpointermove(_: any) {}, set onpointerdown(_: any) {}, set onpointerleave(_: any) {}, innerHTML: "", hidden: false, style: {} }) };
+  const corpo = js.slice(ini, fim);
+  const run = new Function("host", "d", `const $=()=>host,S={dias:14,hover:null},LK=['amazon','terceiros'],COR={amazon:'#000',terceiros:'#111'},NOME={amazon:'Amazon',terceiros:'Terceiros'},brl=v=>'R$ '+v,dm=()=>'d',dt=()=>'t';${corpo}\ngrafico(d);`);
+  const agora = Date.now();
+  const d = {
+    desde: new Date(agora - 14 * 86400000).toISOString(),
+    alvo: 100,
+    semAmazon: [],
+    linhas: { amazon: { ligada: true }, terceiros: { ligada: false } },
+    series: { amazon: [{ t: new Date(agora - 3600000).toISOString(), v: 120 }], terceiros: [] },
+  };
+  expect(() => run(host, d)).not.toThrow();
+  expect(host.innerHTML).toContain("Alvo R$ 100");
+});

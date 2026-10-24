@@ -281,7 +281,7 @@ function grafico(d){const host=$('#chart');if(!host)return;const W=host.clientWi
  s+='<line x1="'+L+'" x2="'+(L+pw)+'" y1="'+(T+ph)+'" y2="'+(T+ph)+'" stroke="var(--axis)"/>';
  const passo=S.dias<=7?1:S.dias<=14?2:5;
  for(let n=0;n*passo<=S.dias;n++){const t=x1-n*passo*86400000;if(t<x0)break;const x=L+(t-x0)/(x1-x0)*pw;s+='<text x="'+x.toFixed(1)+'" y="'+(H-8)+'" text-anchor="'+(n===0?'end':'middle')+'" font-size="11.5" fill="var(--mut)">'+(n===0?'agora':dm(t))+'</text>'}
- {const a=d.alvo;if(a!=null)s+='<line x1="'+L+'" x2="'+(L+pw)+'" y1="'+Y(a).toFixed(1)+'" y2="'+Y(a).toFixed(1)+'" stroke="var(--fg2)" stroke-width="1.5" stroke-dasharray="5 4"/><text x="'+(L+pw-4)+'" y="'+(Y(a)-5).toFixed(1)+'" text-anchor="end" font-size="11.5" fill="var(--fg2)">Alvo '+(k==='amazon'?'':NOME[k]+' ')+brl(a)+'</text>'}
+ {const a=d.alvo;if(a!=null)s+='<line x1="'+L+'" x2="'+(L+pw)+'" y1="'+Y(a).toFixed(1)+'" y2="'+Y(a).toFixed(1)+'" stroke="var(--fg2)" stroke-width="1.5" stroke-dasharray="5 4"/><text x="'+(L+pw-4)+'" y="'+(Y(a)-5).toFixed(1)+'" text-anchor="end" font-size="11.5" fill="var(--fg2)">Alvo '+brl(a)+'</text>'}
  for(const k of ls.slice().reverse()){const pts=d.series[k];if(!pts.length)continue;
   const path=pts.map((p,i)=>i?'H'+X(p.t).toFixed(1)+'V'+Y(p.v).toFixed(1):'M'+X(p.t).toFixed(1)+','+Y(p.v).toFixed(1)).join(''),l=pts[pts.length-1];
   s+='<path d="'+path+'" fill="none" stroke="'+COR[k]+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'+(pts.length===1?'<circle cx="'+X(l.t).toFixed(1)+'" cy="'+Y(l.v).toFixed(1)+'" r="3" fill="'+COR[k]+'"/>':'')+'<circle cx="'+X(l.t).toFixed(1)+'" cy="'+Y(l.v).toFixed(1)+'" r="4.5" fill="'+COR[k]+'" stroke="var(--sf)" stroke-width="2"/>'}
