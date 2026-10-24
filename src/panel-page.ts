@@ -268,10 +268,11 @@ function bindPickers(root){root.querySelectorAll('[data-picker]').forEach(c=>{co
 const ativa=l=>l.ligada||!!l.automatico;
 function tempos(d){const s=new Set();for(const k of LK)if(ativa(d.linhas[k]))for(const p of d.series[k])s.add(p.t);return [...s].sort()}
 function valorEm(d,k,t){const p=d.series[k].find(x=>x.t===t);return p?p.v:null}
-function grafico(d){const host=$('#chart');if(!host)return;const W=host.clientWidth||840,H=290,L=62,R=14,T=14,B=28,x0=Date.parse(d.desde),x1=Date.now();
+function grafico(d){const host=$('#chart');if(!host)return;const W=host.clientWidth||840,H=290,L=62,R=14,T=14,B=28,zm=S.zoom||null,x0=zm?zm[0]:Date.parse(d.desde),x1=zm?zm[1]:Date.now();
  const ls=LK.filter(k=>ativa(d.linhas[k]));
- let vals=ls.flatMap(k=>d.series[k].map(p=>p.v));
- if(!vals.length){host.innerHTML='<p class="mut">Sem coletas neste período.</p>';return}
+ const vis=pts=>zm?pts.filter((p,i)=>{const t=Date.parse(p.t),n=pts[i+1];return (t>=x0&&t<=x1)||(t<x0&&(!n||Date.parse(n.t)>x0))}):pts;
+ let vals=ls.flatMap(k=>vis(d.series[k]).map(p=>p.v));
+ if(!vals.length){host.innerHTML='<p class="mut">Sem coletas '+(zm?'neste intervalo.':'neste período.')+'</p>';return}
  if(d.alvo!=null)vals.push(d.alvo);
  let y0=Math.min(...vals),y1=Math.max(...vals);const sp=Math.max(y1-y0,y1*.05);y0-=sp*.12;y1+=sp*.12;
  const pw=W-L-R,ph=H-T-B,X=t=>L+(Date.parse(t)-x0)/(x1-x0)*pw,Y=v=>T+(1-(v-y0)/(y1-y0))*ph;
@@ -280,13 +281,16 @@ function grafico(d){const host=$('#chart');if(!host)return;const W=host.clientWi
  for(const g of d.semAmazon){const a=Math.max(L,X(g.de)),b=Math.min(L+pw,X(g.ate));s+='<rect x="'+a.toFixed(1)+'" y="'+T+'" width="'+Math.max(2,b-a).toFixed(1)+'" height="'+ph+'" fill="var(--gap)"><title>Amazon não vendeu</title></rect>'+(b-a>96?'<text x="'+(a+8).toFixed(1)+'" y="'+(T+14)+'" font-size="11.5" fill="var(--mut)">Amazon sem oferta</text>':'')}
  s+='<line x1="'+L+'" x2="'+(L+pw)+'" y1="'+(T+ph)+'" y2="'+(T+ph)+'" stroke="var(--axis)"/>';
  const passo=S.dias<=7?1:S.dias<=14?2:5;
- for(let n=0;n*passo<=S.dias;n++){const t=x1-n*passo*86400000;if(t<x0)break;const x=L+(t-x0)/(x1-x0)*pw;s+='<text x="'+x.toFixed(1)+'" y="'+(H-8)+'" text-anchor="'+(n===0?'end':'middle')+'" font-size="11.5" fill="var(--mut)">'+(n===0?'agora':dm(t))+'</text>'}
+ if(zm){const nt=W<500?3:5,curto=x1-x0<2*86400000;for(let i=0;i<nt;i++){const t=x0+(x1-x0)*i/(nt-1),x=L+pw*i/(nt-1);s+='<text x="'+x.toFixed(1)+'" y="'+(H-8)+'" text-anchor="'+(i===0?'start':i===nt-1?'end':'middle')+'" font-size="11.5" fill="var(--mut)">'+(curto?dt(t):dm(t))+'</text>'}}
+ else for(let n=0;n*passo<=S.dias;n++){const t=x1-n*passo*86400000;if(t<x0)break;const x=L+(t-x0)/(x1-x0)*pw;s+='<text x="'+x.toFixed(1)+'" y="'+(H-8)+'" text-anchor="'+(n===0?'end':'middle')+'" font-size="11.5" fill="var(--mut)">'+(n===0?'agora':dm(t))+'</text>'}
  {const a=d.alvo;if(a!=null)s+='<line x1="'+L+'" x2="'+(L+pw)+'" y1="'+Y(a).toFixed(1)+'" y2="'+Y(a).toFixed(1)+'" stroke="var(--fg2)" stroke-width="1.5" stroke-dasharray="5 4"/><text x="'+(L+pw-4)+'" y="'+(Y(a)-5).toFixed(1)+'" text-anchor="end" font-size="11.5" fill="var(--fg2)">Alvo '+brl(a)+'</text>'}
+ s+='<defs><clipPath id="cp"><rect x="'+(L-6)+'" y="'+(T-6)+'" width="'+(pw+12)+'" height="'+(ph+12)+'"/></clipPath></defs><g clip-path="url(#cp)">';
  for(const k of ls.slice().reverse()){const pts=d.series[k];if(!pts.length)continue;
   const path=pts.map((p,i)=>i?'H'+X(p.t).toFixed(1)+'V'+Y(p.v).toFixed(1):'M'+X(p.t).toFixed(1)+','+Y(p.v).toFixed(1)).join(''),l=pts[pts.length-1];
   s+='<path d="'+path+'" fill="none" stroke="'+COR[k]+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'+(pts.length===1?'<circle cx="'+X(l.t).toFixed(1)+'" cy="'+Y(l.v).toFixed(1)+'" r="3" fill="'+COR[k]+'"/>':'')+'<circle cx="'+X(l.t).toFixed(1)+'" cy="'+Y(l.v).toFixed(1)+'" r="4.5" fill="'+COR[k]+'" stroke="var(--sf)" stroke-width="2"/>'}
- const ts=tempos(d);
- s+='<g id="hv"></g><rect x="'+L+'" y="0" width="'+pw+'" height="'+(T+ph)+'" fill="transparent" data-hit="1"/>';
+ s+='</g>';
+ const ts=tempos(d).filter(t=>!zm||(Date.parse(t)>=x0&&Date.parse(t)<=x1));
+ s+='<rect id="sel" y="'+T+'" height="'+ph+'" fill="var(--accsoft)" stroke="var(--acc)" opacity=".6" display="none" pointer-events="none"/><g id="hv"></g><rect x="'+L+'" y="0" width="'+pw+'" height="'+(T+ph)+'" fill="transparent" data-hit="1"/>';
  host.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" height="'+H+'" role="img" aria-label="Histórico de preços. Use as setas para ler cada coleta.">'+s+'</svg><div class="tip" id="tip" hidden></div>';
  const hover=()=>{const hv=host.querySelector('#hv'),tp=host.querySelector('#tip');
   if(S.hover==null||!ts[S.hover]){hv.innerHTML='';tp.hidden=true;return}
@@ -298,7 +302,13 @@ function grafico(d){const host=$('#chart');if(!host)return;const W=host.clientWi
  hover();
  const idx=e=>{const r=host.querySelector('svg').getBoundingClientRect(),f=Math.max(0,Math.min(1,((e.clientX-r.left)-L)/pw)),tt=x0+f*(x1-x0);let b=0,bd=Infinity;ts.forEach((t,i)=>{const dd=Math.abs(Date.parse(t)-tt);if(dd<bd){bd=dd;b=i}});return b};
  const hit=host.querySelector('[data-hit]');
- hit.onpointermove=hit.onpointerdown=e=>{S.hover=idx(e);hover()};
+ let dr=null;const selr=()=>host.querySelector('#sel'),px=e=>{const r=host.querySelector('svg').getBoundingClientRect();return Math.max(L,Math.min(L+pw,(e.clientX-r.left)*(W/r.width)))};
+ hit.onpointerdown=e=>{S.hover=idx(e);hover();dr={a:px(e),m:false};try{hit.setPointerCapture(e.pointerId)}catch(_){}};
+ hit.onpointermove=e=>{if(dr){const b=px(e);if(Math.abs(b-dr.a)>6)dr.m=true;if(dr.m){const q=selr();q.setAttribute('x',Math.min(dr.a,b));q.setAttribute('width',Math.abs(b-dr.a));q.setAttribute('display','');S.hover=null;hover();return}}S.hover=idx(e);hover()};
+ hit.onpointerup=e=>{if(!dr)return;const d0=dr;dr=null;if(!d0.m)return;const b=px(e),lo=Math.min(d0.a,b),hi=Math.max(d0.a,b);if(hi-lo<8){selr().setAttribute('display','none');return}
+  let a=x0+(lo-L)/pw*(x1-x0),z=x0+(hi-L)/pw*(x1-x0);if(z-a<600000){const c=(a+z)/2;a=c-300000;z=c+300000}S.zoom=[a,z];S.hover=null;renderDir()};
+ hit.onpointercancel=()=>{dr=null;selr().setAttribute('display','none')};
+ hit.ondblclick=()=>{if(S.zoom){S.zoom=null;S.hover=null;renderDir()}};
  hit.onpointerleave=e=>{if(e.pointerType==='mouse'){S.hover=null;hover()}};
  host.onkeydown=e=>{if(!ts.length)return;if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();const c=S.hover==null?ts.length-1:S.hover;S.hover=Math.max(0,Math.min(ts.length-1,c+(e.key==='ArrowLeft'?-1:1)));hover()}else if(e.key==='Escape'){S.hover=null;hover()}}}
 
@@ -322,7 +332,7 @@ function renderDir(){if(S.gsel!=null)return renderGrupo();const d=S.det,it=S.ite
    +'<td class="n num">'+(on?brl(l.min):'—')+'</td><td class="n num">'+(on?brl(l.max):'—')+'</td><td class="n num">'+(on&&l.variacao!=null?pct(l.variacao):'—')+'</td>'
    +(S.edit?'<td>'+(idx===0?'<span class="mut">sempre</span>':'<label><input type="checkbox" data-linha="'+k+'" '+(l.ligada?'checked':'')+'> coletar</label>')+'</td>':'')+'</tr>'});
  h+='</table></div>'+(S.edit?'<div class="mut" style="margin-top:6px">Aviso no Telegram quando a menor oferta (Amazon, Terceiros ou Usado) ficar igual ou abaixo do alvo. Deixe o campo vazio para remover o alvo. Ligar Terceiros ou Usado usa 2 requisições por rodada.</div>':'');
- h+='<div class="bar"><div class="seg">'+[7,14,30].map(n=>'<button type="button" data-n="'+n+'" aria-pressed="'+(n===S.dias)+'">'+n+' dias</button>').join('')+'</div><div class="seg"><button type="button" data-vz="grafico" aria-pressed="'+(S.visao==='grafico')+'">Gráfico</button><button type="button" data-vz="tabela" aria-pressed="'+(S.visao==='tabela')+'">Tabela</button></div></div>';
+ h+='<div class="bar"><div class="seg">'+[7,14,30].map(n=>'<button type="button" data-n="'+n+'" aria-pressed="'+(n===S.dias)+'">'+n+' dias</button>').join('')+'</div><div class="seg"><button type="button" data-vz="grafico" aria-pressed="'+(S.visao==='grafico')+'">Gráfico</button><button type="button" data-vz="tabela" aria-pressed="'+(S.visao==='tabela')+'">Tabela</button></div>'+(S.visao==='grafico'?(S.zoom?'<div class="seg"><button type="button" data-zo="out">− Zoom</button><button type="button" data-zo="all">Tudo</button></div><span class="mut">'+dt(S.zoom[0])+' → '+dt(S.zoom[1])+'</span>':'<span class="mut">Arraste no gráfico para dar zoom</span>'):'')+'</div>';
  if(S.visao==='grafico')h+='<div class="chart" id="chart" tabindex="0"></div><div class="leg">'+LK.filter(k=>ativa(L[k])).map(k=>'<span><i class="key" style="--c:'+COR[k]+'"></i>'+NOME[k]+'</span>').join('')+'<span><i class="g"></i>Amazon não vendeu</span><span><i class="key" style="--c:var(--fg2);border-top-style:dashed"></i>Alvo</span></div>';
  else h+=tabelaColetas(d);
  h+='<div class="sh">Ofertas na última coleta <span class="mut">'+(d.ofertasEm?ago(d.ofertasEm):'')+'</span></div>';
@@ -330,7 +340,8 @@ function renderDir(){if(S.gsel!=null)return renderGrupo();const d=S.det,it=S.ite
  h+=d.ofertas.length?'<div class="tw"><table><tr><th>Vendedor</th><th>Condição</th><th>Envio</th><th class="n">Preço</th><th class="n">Frete</th><th class="n">Total</th></tr>'+d.ofertas.map(o=>{const tot=o.preco+(o.frete||0),menor=!o.descartada&&best[o.condicao]===tot;return '<tr class="'+(o.descartada?'desc':menor?'best':'')+'"><td>'+esc(o.vendedor)+(o.descartada?' <span class="pill fail" style="text-decoration:none">descartada (suspeita)</span>':'')+(menor?' <span class="pill below">menor</span>':'')+'</td><td>'+esc(o.condicao)+'</td><td>'+esc(o.envio)+'</td><td class="n num">'+brl(o.preco)+'</td><td class="n num">'+(o.frete==null?'—':o.frete?brl(o.frete):'grátis')+'</td><td class="n num">'+brl(tot)+'</td></tr>'}).join('')+'</table></div>':'<p class="mut">'+(lido(it)==='nunca'?'Ainda sem leitura desta página.':lido(it)==='erro'?'A última leitura falhou ('+esc(motivo(it.ultimaColeta.motivo))+'), então não há ofertas registradas. Tente Consultar agora.':'Lido sem nenhuma oferta (nem Amazon, nem outros vendedores ligados).')+'</p>';
  $('#dir').innerHTML=h;
  const dir=$('#dir'),A='/api/itens/'+d.asin,re=()=>detalhe();
- dir.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{S.dias=+b.dataset.n;S.hover=null;detalhe()});
+ dir.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>{S.dias=+b.dataset.n;S.hover=null;S.zoom=null;detalhe()});
+ dir.querySelectorAll('[data-zo]').forEach(b=>b.onclick=()=>{const z=S.zoom,full=Date.parse(d.desde),now=Date.now();if(b.dataset.zo==='out'&&z){const sp=z[1]-z[0],c=(z[0]+z[1])/2,a=c-sp,e=c+sp;S.zoom=(a<=full&&e>=now)?null:[Math.max(full,a),Math.min(now,e)]}else S.zoom=null;S.hover=null;renderDir()});
  dir.querySelectorAll('[data-vz]').forEach(b=>b.onclick=()=>{S.visao=b.dataset.vz;S.hover=null;renderDir()});
  if(S.visao==='grafico'){grafico(d);if(window.ResizeObserver){S.ro&&S.ro.disconnect();S.ro=new ResizeObserver(()=>grafico(d));S.ro.observe($('#chart'))}}
  const vg=dir.querySelector('[data-vg]');if(vg)vg.onclick=()=>abrirGrupo(it.grupoId);
@@ -405,7 +416,7 @@ async function detalhe(){salvaT();if(S.gsel!=null){try{S.gdet=await get('/api/gr
  if(!S.sel){S.det=null;renderDir();return}
  try{S.det=await get('/api/itens/'+S.sel+'?dias='+S.dias)}catch(e){S.det=null;S.sel=null}
  renderDir()}
-function selecionar(asin){S.sel=asin;S.gsel=null;S.hover=null;try{history.replaceState(null,'','#'+asin)}catch(e){}renderEsq();detalhe();if(innerWidth<=900)$('#dir').scrollIntoView({behavior:'smooth',block:'start'})}
+function selecionar(asin){S.sel=asin;S.zoom=null;S.gsel=null;S.hover=null;try{history.replaceState(null,'','#'+asin)}catch(e){}renderEsq();detalhe();if(innerWidth<=900)$('#dir').scrollIntoView({behavior:'smooth',block:'start'})}
 async function carregar(){const d=await get('/api/itens');S.itens=d.itens;S.grupos=d.grupos||[];S.sug=d.sugestoes||[];renderSug();if(S.gsel!=null&&!S.grupos.some(g=>g.id===S.gsel))S.gsel=null;S.edit=!!d.edicao;S.saude=d.saude;
  if(!S.itens.some(i=>i.asin===S.sel))S.sel=S.itens.length?S.itens[0].asin:null;
  if(F.gr&&F.gr!=='none'&&!S.grupos.some(g=>String(g.id)===F.gr))F.gr='';
