@@ -65,6 +65,20 @@ textarea{width:100%;resize:vertical;padding:8px}input.val{width:96px;text-align:
 .over{outline:2px dashed var(--acc);outline-offset:2px;background:var(--accsoft)}.itw.drag{opacity:.45}.itw[draggable=true] .item{cursor:grab}
 @media(min-width:901px){html,body{height:100%}main{height:100vh;display:flex;flex-direction:column;padding-bottom:12px}.split{flex:1;min-height:0;align-items:stretch;grid-template-rows:minmax(0,1fr)}.det{min-height:0;overflow-y:auto;overscroll-behavior:contain}.esq{display:flex;flex-direction:column;min-height:0;background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:8px}#lst{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:6px 12px 12px 6px}}
 @media(max-width:900px){.split{grid-template-columns:minmax(0,1fr)}}
+/* acabamento visual */
+.itw,.btn,.mbtn,.seg button,.pill{transition:background-color .15s,border-color .15s,box-shadow .15s,color .15s}
+.itw:hover{box-shadow:0 2px 10px rgba(16,22,27,.08)}
+.btn:active,.mbtn:active{transform:translateY(1px)}
+.btn.pri{box-shadow:0 1px 2px rgba(16,22,27,.18)}
+th{text-transform:uppercase;letter-spacing:.04em;font-size:11px}
+tbody tr:hover td,table tr:not(:first-child):hover td{background:var(--sf2)}
+.vazio{padding:56px 20px;font-size:14.5px;line-height:1.6}
+.vazio::before{content:"\\1F4C9";display:block;font-size:30px;margin-bottom:8px;opacity:.55}
+.dh h2{letter-spacing:-.01em}
+.sh{padding-top:14px;border-top:1px solid var(--bd)}
+.tip{box-shadow:var(--sh);line-height:1.5}.tip .r+.r{margin-top:2px}
+.item .pr{letter-spacing:-.01em}
+@media(max-width:600px){main{padding:8px 8px 40px}#topo{padding:8px 10px}.det{padding:12px}.mbtn,.btn{min-height:38px;display:inline-flex;align-items:center}.btn.sm{min-height:32px}input[type=text],select,textarea{font-size:16px}.dh h2{font-size:17px}.dh .foto{width:64px;height:64px}.item{grid-template-columns:44px minmax(0,1fr) auto}.item .foto{width:44px;height:44px}.tip{min-width:130px}}
 </style></head><body><main><header id="topo" class="cd"><div id="saude" class="saude">Carregando…</div>
 <div id="menu"><div class="mb"><button type="button" class="mbtn" data-pn="res" aria-expanded="false">📊 Resumo</button><button type="button" class="mbtn" data-pn="add" aria-expanded="false" hidden>＋ Rastrear produtos</button><button type="button" class="mbtn" data-pn="grp" aria-expanded="false" hidden>▦ Grupos <b id="ngrp"></b></button><button type="button" class="mbtn" data-pn="sug" aria-expanded="false" hidden>✦ Sugestões <b id="nsug"></b></button><button type="button" class="mbtn" data-pn="fil" aria-expanded="false">⚙ Filtros <b id="nfil"></b></button></div><div id="menuq"></div></div></header>
 <div id="pns"><div class="cd pn" id="pn-add" hidden></div><div class="cd pn" id="pn-grp" hidden></div><div class="cd pn" id="pn-sug" hidden></div><div class="cd pn" id="pn-fil" hidden></div><div class="cd pn" id="pn-res" hidden></div></div>
@@ -281,7 +295,7 @@ function grafico(d){const host=$('#chart');if(!host)return;const W=host.clientWi
  let y0=Math.min(...vals),y1=Math.max(...vals);const sp=Math.max(y1-y0,y1*.05);y0-=sp*.12;y1+=sp*.12;
  const pw=W-L-R,ph=H-T-B,X=t=>L+(Date.parse(t)-x0)/(x1-x0)*pw,Y=v=>T+(1-(v-y0)/(y1-y0))*ph;
  let s='';
- for(let i=0;i<=4;i++){const p=y0+(y1-y0)*i/4,y=Y(p);s+='<line x1="'+L+'" x2="'+(L+pw)+'" y1="'+y.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="var(--grid)"/><text x="'+(L-8)+'" y="'+(y+4).toFixed(1)+'" text-anchor="end" font-size="11.5" fill="var(--mut)">R$ '+Math.round(p).toLocaleString('pt-BR')+'</text>'}
+ for(let i=0;i<=4;i++){const p=y0+(y1-y0)*i/4,y=Y(p);s+='<line x1="'+L+'" x2="'+(L+pw)+'" y1="'+y.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="var(--grid)" stroke-dasharray="2 4"/><text x="'+(L-8)+'" y="'+(y+4).toFixed(1)+'" text-anchor="end" font-size="11.5" fill="var(--mut)">R$ '+Math.round(p).toLocaleString('pt-BR')+'</text>'}
  for(const g of d.semAmazon){const a=Math.max(L,X(g.de)),b=Math.min(L+pw,X(g.ate));s+='<rect x="'+a.toFixed(1)+'" y="'+T+'" width="'+Math.max(2,b-a).toFixed(1)+'" height="'+ph+'" fill="var(--gap)"><title>Amazon não vendeu</title></rect>'+(b-a>96?'<text x="'+(a+8).toFixed(1)+'" y="'+(T+14)+'" font-size="11.5" fill="var(--mut)">Amazon sem oferta</text>':'')}
  s+='<line x1="'+L+'" x2="'+(L+pw)+'" y1="'+(T+ph)+'" y2="'+(T+ph)+'" stroke="var(--axis)"/>';
  const passo=S.dias<=7?1:S.dias<=14?2:5;
