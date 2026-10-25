@@ -32,7 +32,10 @@ describe("resumoMensagens", () => {
     const [m] = resumoMensagens(store, NOW);
     expect(m).toContain("Dentro do alvo");
     expect(m).toContain('<a href="https://www.amazon.com.br/dp/B000000001">Tênis &lt;Azul&gt; &amp; Cia</a>');
-    expect(m!.indexOf("★ ")).toBeLessThan(m!.indexOf("Tênis"));
+    expect(m).toContain('★ <a href="https://www.amazon.com.br/dp/B000000002">Fone</a>\n   └ <b>R$ 90,00</b>');
+    expect(m).toContain("• <a");
+    expect(m).toContain("</a>\n   └ ");
+    expect(m).toMatch(/\n\n• <a/); // linha em branco entre itens
     expect(m).toContain("Maiores quedas");
     expect(m).toContain("Mais perto do alvo");
     expect(m).toContain('dp/B000000009">Mouse CD</a>');
@@ -52,7 +55,7 @@ describe("resumoMensagens", () => {
     const msgs = resumoMensagens(store, NOW);
     const todas = msgs.join("\n");
     expect((todas.match(/<a href/g) ?? []).length).toBe(10);
-    expect(todas).toContain("e mais 15");
+    expect(todas).toContain("e mais 15 no painel");
     for (const m of msgs) expect(m.length).toBeLessThan(4096);
   });
 
