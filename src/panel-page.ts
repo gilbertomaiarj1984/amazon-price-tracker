@@ -148,11 +148,15 @@ function passa(i){const a=i.linhas.amazon,t=sem(i.titulo)+' '+i.asin.toLowerCase
  if((mn!=null||mx!=null)&&p==null)return false;
  if(mn!=null&&p<mn)return false;if(mx!=null&&p>mx)return false;return true}
 const ORD={num:['Ordem de cadastro',i=>i.num],nome:['Nome',i=>sem(i.titulo||i.asin)],preco:['Preço atual',preco],dist:['Distância até o alvo (%)',dist],var30:['Variação 30 dias',i=>i.linhas.amazon.variacao],queda:['Queda recente (7 dias)',queda],coleta:['Última coleta',ultima],criado:['Data de cadastro',i=>Date.parse(i.criadoEm)]};
+function chaveOrd(i,f){const k=f[1](i);return F.ord==='nome'&&i.grupoId!=null&&gnome(i.grupoId)?sem(gnome(i.grupoId)):k}
 function visiveis(){const f=ORD[F.ord]||ORD.num,sg=F.dir==='desc'?-1:1;
- return S.itens.filter(passa).map(i=>({i,k:f[1](i)})).sort((x,y)=>{
+ return S.itens.filter(passa).map(i=>({i,k:chaveOrd(i,f),k2:f[1](i)})).sort((x,y)=>{
   if(x.i.estrela!==y.i.estrela)return x.i.estrela?-1:1;
   if(x.k==null||y.k==null)return x.k==null&&y.k==null?x.i.num-y.i.num:x.k==null?1:-1;
-  const c=typeof x.k==='string'?x.k.localeCompare(y.k,'pt-BR'):x.k-y.k;return c?c*sg:x.i.num-y.i.num}).map(o=>o.i)}
+  let c=typeof x.k==='string'?x.k.localeCompare(y.k,'pt-BR'):x.k-y.k;
+  if(!c&&F.ord==='nome'&&x.i.grupoId!==y.i.grupoId)return (x.i.grupoId??0)-(y.i.grupoId??0);
+  if(!c&&F.ord==='nome')c=x.k2.localeCompare(y.k2,'pt-BR');
+  return c?c*sg:x.i.num-y.i.num}).map(o=>o.i)}
 function nFiltros(){const n=[F.st,F.gr,F.ln,F.min,F.max].filter(Boolean).length;const b=$('#nfil');if(b)b.textContent=n?'('+n+')':''}
 function initFiltros(){const el=$('#pn-fil');
  const opt=(o,v)=>Object.entries(o).map(([k,l])=>'<option value="'+k+'"'+(k===v?' selected':'')+'>'+esc(Array.isArray(l)?l[0]:l)+'</option>').join('');

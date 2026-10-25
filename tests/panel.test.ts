@@ -606,3 +606,23 @@ test("gráfico desenha com alvo definido (sem ReferenceError)", async () => {
   rz(host, d, { dias: 14, hover: null, zoom: [agora - 20 * 86400000, agora - 19 * 86400000] });
   expect(host.innerHTML).toContain("neste intervalo");
 });
+
+test("ordenação por nome intercala grupos e itens soltos pelo nome do grupo", async () => {
+  const html = await (await get("/")).text();
+  const js = html.split("<script>")[1]!.split("</script>")[0]!;
+  const ini = js.indexOf("const ORD=");
+  const fim = js.indexOf("function nFiltros");
+  const run = new Function("S0", "F0", `const S=S0,F=F0,sem=s=>String(s).toLowerCase(),passa=()=>true,gnome=id=>(S.grupos.find(g=>g.id===id)||{}).nome,preco=i=>i.p,dist=()=>null,queda=()=>null,ultima=()=>null;${js.slice(ini, fim)}\nreturn visiveis().map(i=>i.titulo);`);
+  const it = (titulo: string, num: number, grupoId: number | null = null, extra: any = {}) => ({ titulo, asin: "A" + num, num, grupoId, estrela: false, p: num, linhas: { amazon: {} }, ...extra });
+  const S = {
+    grupos: [{ id: 1, nome: "Beta" }, { id: 2, nome: "delta" }],
+    itens: [it("Zebra", 1, 1), it("Alfa", 2), it("Abacate", 3, 1), it("Charlie", 4), it("Eco", 5), it("Foxtrot", 6, 2)],
+  };
+  // Beta (Abacate, Zebra) entra entre Alfa e Charlie; delta entre Charlie e Eco
+  expect(run(S, { ord: "nome", dir: "asc" })).toEqual(["Alfa", "Abacate", "Zebra", "Charlie", "Foxtrot", "Eco"]);
+  expect(run(S, { ord: "nome", dir: "desc" })).toEqual(["Eco", "Foxtrot", "Charlie", "Zebra", "Abacate", "Alfa"]);
+  // estrela continua primeiro; outras ordenações não mudam
+  S.itens[4]!.estrela = true;
+  expect(run(S, { ord: "nome", dir: "asc" })[0]).toBe("Eco");
+  expect(run(S, { ord: "preco", dir: "asc" })).toEqual(["Eco", "Zebra", "Alfa", "Abacate", "Charlie", "Foxtrot"]);
+});
