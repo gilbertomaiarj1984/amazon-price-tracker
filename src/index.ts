@@ -8,6 +8,7 @@ import { collectOne, realDeps } from "./collector.ts";
 import { loadConfig } from "./config.ts";
 import { Store } from "./db.ts";
 import { MAX_BODY, panelHandler } from "./panel.ts";
+import { marcarResumo, resumoDevido, resumoMensagens } from "./resumo.ts";
 import { runVarredura, varreduraDevida } from "./sugestoes.ts";
 import { createLock } from "./mutex.ts";
 import { loop, msToNextSlot, runCycle } from "./scheduler.ts";
@@ -159,6 +160,20 @@ if (cfg.sugestoes) {
     if (r.parou && !cfg.alertasApenasAlvo) await send("A varredura de sugestões parou: a Amazon pediu captcha. Tento de novo amanhã.").catch(() => undefined);
   };
   void loop(varredura, { intervalMs: 15 * 60_000, firstDelayMs: 60_000, jitterMs: () => Math.round(Math.random() * 60_000), sleep, signal: ac.signal, log });
+}
+
+if (cfg.resumoHoras) {
+  const horas = cfg.resumoHoras;
+  // Exceção ao ALERTAS_APENAS_ALVO: o resumo é pedido e sai mesmo sem item no alvo. Marca antes de enviar para não repetir.
+  const resumo = async () => {
+    const chave = resumoDevido(store, new Date(), horas);
+    if (!chave) return;
+    marcarResumo(store, chave);
+    for (const m of resumoMensagens(store, new Date())) await send(m).catch((e) => log(`resumo não enviado: ${(e as Error).message}`));
+    log(`resumo enviado (${chave})`);
+  };
+  // Acorda nos slots :00 e :30; o primeiro é o próximo da grade, então subir ou reiniciar o app não envia nada.
+  void loop(resumo, { intervalMs: 30 * 60_000, firstDelayMs: msToNextSlot(Date.now(), 30) + 5_000, nextDelayMs: () => msToNextSlot(Date.now(), 30) + 5_000, jitterMs: () => 0, sleep, signal: ac.signal, log });
 }
 
 const stop = () => {

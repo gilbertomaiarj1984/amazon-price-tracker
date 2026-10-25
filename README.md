@@ -78,6 +78,8 @@ O app roda sozinho e não toca em nenhum outro projeto do mesmo servidor: diret�
 
 Por padrão (`ALERTAS_APENAS_ALVO=1`) o bot só envia mensagem espontânea quando um item está **dentro do alvo**: ao entrar na faixa e depois só se o preço cair mais. Itens sem alvo não alertam. Novo mínimo e "voltou a vender" só avisam se o preço está no alvo. Falhas de coleta, normalização, sugestões diárias e a mensagem de início ficam só no log (sugestões continuam no painel). Respostas a comandos não mudam. `ALERTAS_APENAS_ALVO=0` no `.env` volta ao comportamento anterior.
 
+**Resumo no Telegram.** Duas vezes por dia (padrão 9h e 19h, Brasília) o bot manda o mesmo resumo da página Resumo do painel: dentro do alvo, maiores quedas (7 dias), mais perto do alvo e sugestões pendentes, com cada item como link para a página na Amazon (itens com ★ primeiro, até 10 por seção). É a exceção do `ALERTAS_APENAS_ALVO`: sai mesmo sem item no alvo. `/resumo` traz na hora. `RESUMO_HORAS=8,12,20` muda os horários; `RESUMO=0` desliga o envio automático. Reiniciar o app não dispara envio; só o horário.
+
 ## Aviso
 
 A Amazon proíbe coleta automática nos termos de uso. O projeto foi pensado para uso pessoal e baixo volume (dezenas de produtos, uma requisição por produto a cada 30 minutos). O efeito prático esperado é bloqueio de IP, mas o risco é seu.
