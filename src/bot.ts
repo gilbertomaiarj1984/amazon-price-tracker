@@ -6,6 +6,7 @@ import type { CollectOutcome } from "./collector.ts";
 import type { Product, Store } from "./db.ts";
 import * as fmt from "./format.ts";
 import { parseUserNumber } from "./numbers.ts";
+import { resumoMensagens } from "./resumo.ts";
 import type { Button } from "./telegram.ts";
 import { LINE_NAMES } from "./types.ts";
 import { buildView } from "./view.ts";
@@ -91,6 +92,9 @@ export class Bot {
         return this.d.send(fmt.HELP);
       case "/lista":
         return this.d.send(fmt.LISTA_AVISO);
+      case "/resumo":
+        for (const m of resumoMensagens(this.store, this.d.now())) await this.d.send(m);
+        return;
       case "/item": {
         const p = await needP();
         return p ? this.d.send(fmt.card(this.view(p)), [...alertKeyboard(p), [{ text: "Consultar agora", callback_data: `q:${p.id}` }]], photoOf(p)) : undefined;

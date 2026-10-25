@@ -109,6 +109,7 @@ export function productFailure(v: ProductView, kind: string, n: number): string 
 }
 
 export const HELP = `<b>Comandos</b>
+<code>/resumo</code>  dentro do alvo, maiores quedas, mais perto do alvo e sugestões (também chega sozinho 2x ao dia)
 <code>/item N</code>  card do item com foto, preço e botão Consultar agora
 <code>/historico N</code>  mínimo, máximo e variação
 <code>/linhas N</code>  liga ou desliga Terceiros e Usado

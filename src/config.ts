@@ -15,6 +15,8 @@ export interface Config {
   panelReadonly: boolean;
   /** ALERTAS_APENAS_ALVO (padrão ligado; =0 desliga): o bot só avisa por conta própria de item dentro do alvo. */
   alertasApenasAlvo: boolean;
+  /** Resumo no Telegram nas horas cheias (Brasília) listadas. RESUMO=0 desliga; RESUMO_HORAS=9,19 (padrão). */
+  resumoHoras: number[] | null;
   /** Varredura diária de equivalentes vendidos pela Amazon (SUGESTOES=0 desliga). */
   sugestoes: { hora: number; maxItens: number; maxCandidatos: number; pausaMinMs: number; pausaMaxMs: number } | null;
 }
@@ -25,6 +27,13 @@ function intOf(env: Record<string, string | undefined>, key: string, def: number
   const n = Number(raw);
   if (!Number.isInteger(n) || n < min) throw new Error(`${key} inválido: use um inteiro >= ${min}`);
   return n;
+}
+
+function horasOf(raw: string | undefined): number[] {
+  if (raw == null || raw.trim() === "") return [9, 19];
+  const hs = raw.split(",").map((x) => x.trim());
+  if (hs.some((h) => !/^\d{1,2}$/.test(h) || Number(h) > 23)) throw new Error("RESUMO_HORAS inválido: use horas de 0 a 23 separadas por vírgula (ex.: 9,19)");
+  return [...new Set(hs.map(Number))].sort((a, b) => a - b);
 }
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
@@ -42,6 +51,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   const pausaMinMs = intOf(env, "SUGESTOES_PAUSA_MIN_MS", 15_000, 2000);
   return {
     alertasApenasAlvo: !/^(0|false|nao|não)$/i.test(env["ALERTAS_APENAS_ALVO"]?.trim() ?? ""),
+    resumoHoras: /^(0|false|nao|não)$/i.test(env["RESUMO"]?.trim() ?? "") ? null : horasOf(env["RESUMO_HORAS"]),
     sugestoes: /^(0|false|nao|não)$/i.test(env["SUGESTOES"]?.trim() ?? "")
       ? null
       : {
