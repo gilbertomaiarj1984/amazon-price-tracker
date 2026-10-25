@@ -74,6 +74,10 @@ Ele faz ~50 requisições espaçadas (2 a 5 s), imprime a taxa de sucesso por ti
 
 O app roda sozinho e não toca em nenhum outro projeto do mesmo servidor: diretório, projeto Compose, rede, volume, bot do Telegram e secrets próprios, sem portas publicadas (o painel web é exposto só pelo Caddy do servidor, com login, via rede `proxy`; veja `docs/painel.md`) e sem depender de Postgres ou do Docker socket. Detalhes em `CLAUDE.md`.
 
+## Quando o bot fala sozinho
+
+Por padrão (`ALERTAS_APENAS_ALVO=1`) o bot só envia mensagem espontânea quando um item está **dentro do alvo**: ao entrar na faixa e depois só se o preço cair mais. Itens sem alvo não alertam. Novo mínimo e "voltou a vender" só avisam se o preço está no alvo. Falhas de coleta, normalização, sugestões diárias e a mensagem de início ficam só no log (sugestões continuam no painel). Respostas a comandos não mudam. `ALERTAS_APENAS_ALVO=0` no `.env` volta ao comportamento anterior.
+
 ## Aviso
 
 A Amazon proíbe coleta automática nos termos de uso. O projeto foi pensado para uso pessoal e baixo volume (dezenas de produtos, uma requisição por produto a cada 30 minutos). O efeito prático esperado é bloqueio de IP, mas o risco é seu.

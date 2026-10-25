@@ -13,6 +13,8 @@ export interface Config {
   userscriptToken: string | null;
   /** PANEL_READONLY=1 desliga as ações de escrita do painel (cadastrar, alvo, pausar, linhas, remover). */
   panelReadonly: boolean;
+  /** ALERTAS_APENAS_ALVO (padrão ligado; =0 desliga): o bot só avisa por conta própria de item dentro do alvo. */
+  alertasApenasAlvo: boolean;
   /** Varredura diária de equivalentes vendidos pela Amazon (SUGESTOES=0 desliga). */
   sugestoes: { hora: number; maxItens: number; maxCandidatos: number; pausaMinMs: number; pausaMaxMs: number } | null;
 }
@@ -39,6 +41,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   const reqMaxMs = intOf(env, "REQ_MAX_MS", 5000, reqMinMs);
   const pausaMinMs = intOf(env, "SUGESTOES_PAUSA_MIN_MS", 15_000, 2000);
   return {
+    alertasApenasAlvo: !/^(0|false|nao|não)$/i.test(env["ALERTAS_APENAS_ALVO"]?.trim() ?? ""),
     sugestoes: /^(0|false|nao|não)$/i.test(env["SUGESTOES"]?.trim() ?? "")
       ? null
       : {
