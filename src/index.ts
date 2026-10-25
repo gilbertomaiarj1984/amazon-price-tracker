@@ -102,6 +102,7 @@ const cycle = () =>
     sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
     pauseMs: delay,
     log,
+    apenasAlvo: cfg.alertasApenasAlvo,
   }).finally(() => store.setMeta("last_cycle_at", String(Date.now())));
 
 if (cfg.panel) {
@@ -140,7 +141,9 @@ if (cfg.sugestoes) {
       maxItens: sg.maxItens,
       maxCandidatos: sg.maxCandidatos,
     });
-    if (r.novas > 0) {
+    // Com ALERTAS_APENAS_ALVO, as sugestões só ficam no painel (e em /sugestoes), sem mensagem espontânea.
+    if (r.novas > 0 && cfg.alertasApenasAlvo) log(`${r.novas} nova(s) sugestão(ões) guardada(s), sem aviso (ALERTAS_APENAS_ALVO)`);
+    if (r.novas > 0 && !cfg.alertasApenasAlvo) {
       const pend = store.listSugestoes();
       await send(`<b>${r.novas} nova(s) sugestão(ões)</b> de item vendido e entregue pela Amazon para itens que ela não vende. ${pend.length} pendente(s)${cfg.panel ? "; também aparecem no painel (Sugestões)" : ""}.`).catch((e) => log(`aviso de sugestões não enviado: ${(e as Error).message}`));
       for (const s of pend.slice(-3)) {
@@ -152,7 +155,8 @@ if (cfg.sugestoes) {
         ).catch((e) => log(`sugestão não enviada: ${(e as Error).message}`));
       }
     }
-    if (r.parou) await send("A varredura de sugestões parou: a Amazon pediu captcha. Tento de novo amanhã.").catch(() => undefined);
+    if (r.parou && cfg.alertasApenasAlvo) log("varredura de sugestões parou: captcha");
+    if (r.parou && !cfg.alertasApenasAlvo) await send("A varredura de sugestões parou: a Amazon pediu captcha. Tento de novo amanhã.").catch(() => undefined);
   };
   void loop(varredura, { intervalMs: 15 * 60_000, firstDelayMs: 60_000, jitterMs: () => Math.round(Math.random() * 60_000), sleep, signal: ac.signal, log });
 }
@@ -167,7 +171,7 @@ process.on("SIGTERM", stop);
 process.on("SIGINT", stop);
 
 log(`iniciado: ${store.list().length} itens, rodada a cada ${cfg.intervalMin} min em horário fixo, primeira em ${Math.round(firstDelayMs / 1000)} s`);
-await send(`<b>Rastreador no ar.</b> ${store.list().length} itens, rodada a cada ${cfg.intervalMin} min. Use <code>/ajuda</code>.`).catch((e) => log(`aviso de início não enviado: ${(e as Error).message}`));
+if (!cfg.alertasApenasAlvo) await send(`<b>Rastreador no ar.</b> ${store.list().length} itens, rodada a cada ${cfg.intervalMin} min. Use <code>/ajuda</code>.`).catch((e) => log(`aviso de início não enviado: ${(e as Error).message}`));
 
 void loop(cycle, { intervalMs, firstDelayMs, nextDelayMs: slotDelay, jitterMs: () => 0, sleep, signal: ac.signal, log });
 await poll();

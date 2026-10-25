@@ -102,6 +102,43 @@ describe("runCycle", () => {
   });
 });
 
+describe("ALERTAS_APENAS_ALVO", () => {
+  const comEvento = (evento: object) => async (p: Parameters<CycleDeps["collect"]>[0]) => {
+    const r = await collectOne(store, p, net.deps);
+    return r.ok ? { ...r, alertas: [{ product: p, evento: evento as never, vendedor: null }] } : r;
+  };
+  const minimo = (preco: number) => ({ tipo: "novo_minimo", linha: "amazon", preco, minimoAnterior: 90 });
+
+  test("falhas de coleta, produto isolado e normalização só vão para o log", async () => {
+    net.product = fx("captcha.html");
+    for (let i = 0; i < 7; i++) {
+      await runCycle({ ...deps(), apenasAlvo: true });
+      tick(net);
+    }
+    net.product = fx("product-real-shape.html");
+    await runCycle({ ...deps(), apenasAlvo: true });
+    expect(sent).toHaveLength(0);
+  });
+
+  test("novo mínimo sem alvo ou fora do alvo não avisa; dentro do alvo avisa", async () => {
+    const d = { ...deps(), apenasAlvo: true };
+    await runCycle({ ...d, collect: comEvento(minimo(50)) });
+    expect(sent).toHaveLength(0);
+    store.setAlvo(1, 40);
+    tick(net);
+    await runCycle({ ...d, collect: comEvento(minimo(50)) });
+    expect(sent).toHaveLength(0);
+    tick(net);
+    await runCycle({ ...d, collect: comEvento(minimo(35)) });
+    expect(sent).toHaveLength(1);
+  });
+
+  test("desligado, novo mínimo sem alvo ainda avisa", async () => {
+    await runCycle({ ...deps(), collect: comEvento(minimo(50)) });
+    expect(sent).toHaveLength(1);
+  });
+});
+
 describe("falha geral e recuperação", () => {
   test("avisa na 3ª rodada seguida sem nenhum sucesso, e quando normaliza", async () => {
     net.product = fx("captcha.html");

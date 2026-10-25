@@ -15,6 +15,8 @@ export interface CycleDeps {
   /** Pausa entre produtos. */
   pauseMs: () => number;
   log: (msg: string) => void;
+  /** ALERTAS_APENAS_ALVO: só envia aviso espontâneo de item dentro do alvo; falhas de coleta ficam só no log. */
+  apenasAlvo?: boolean;
 }
 
 export interface CycleResult {
@@ -62,7 +64,7 @@ export async function runCycle(d: CycleDeps): Promise<CycleResult> {
       res.falhas++;
       kinds.add(outcome.kind);
       d.log(`falha em ${p.asin}: ${outcome.kind} (${outcome.falhasProduto} seguidas)`);
-      if (outcome.avisarProduto) {
+      if (outcome.avisarProduto && !d.apenasAlvo) {
         const fresh = d.store.getById(p.id);
         if (fresh) await sendWithRetry(d, fmt.productFailure(buildView(d.store, fresh, d.now()), outcome.kind, outcome.falhasProduto));
       }
@@ -70,6 +72,11 @@ export async function runCycle(d: CycleDeps): Promise<CycleResult> {
     }
     res.ok++;
     for (const item of outcome.alertas) {
+      // O aviso de "alvo" já nasce dentro do alvo; os demais (novo mínimo, voltou a vender) só valem se o preço está no alvo.
+      if (d.apenasAlvo && item.evento.tipo !== "alvo") {
+        const alvo = d.store.getAlvo(item.product.id);
+        if (alvo == null || item.evento.preco > alvo) continue;
+      }
       if (isMuted(d.store, item.product.id, d.now())) continue;
       const fresh = d.store.getById(item.product.id) ?? item.product;
       if (await sendWithRetry(d, fmt.alert(item, buildView(d.store, fresh, d.now())), alertKeyboard(fresh), photoOf(fresh))) res.alertas++;
@@ -82,9 +89,9 @@ export async function runCycle(d: CycleDeps): Promise<CycleResult> {
       const n = prev + 1;
       d.store.setMeta(FAILS, String(n));
       if (n === 1) d.store.setMeta(FAILS_SINCE, hhmm(d.now()));
-      if (shouldAlertFailures(n)) await sendWithRetry(d, fmt.cycleFailure(n, [...kinds], d.store.getMeta(FAILS_SINCE) ?? "?"));
+      if (shouldAlertFailures(n) && !d.apenasAlvo) await sendWithRetry(d, fmt.cycleFailure(n, [...kinds], d.store.getMeta(FAILS_SINCE) ?? "?"));
     } else {
-      if (recovered(prev)) await sendWithRetry(d, fmt.cycleRecovered());
+      if (recovered(prev) && !d.apenasAlvo) await sendWithRetry(d, fmt.cycleRecovered());
       d.store.setMeta(FAILS, null);
       d.store.setMeta(FAILS_SINCE, null);
     }
