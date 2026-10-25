@@ -11,7 +11,7 @@ export const LIMITE_LARANJA = 20;
 export const MAX_POR_SECAO = 10;
 /** Telegram aceita 4096 caracteres; sobra margem para o HTML. */
 const MAX_MSG = 3800;
-const TITULO_MAX = 70;
+const TITULO_MAX = 60;
 
 const RESUMO_KEY = "resumo:ultimo";
 
@@ -26,11 +26,13 @@ export const queda = (i: PanelItem): number | null => {
   return m.length > 1 && first?.v && lastPt ? ((lastPt.v - first.v) / first.v) * 100 : null;
 };
 
-const link = (i: PanelItem): string => {
-  const t = (i.titulo ?? i.asin).trim();
-  const nome = t.length > TITULO_MAX ? `${t.slice(0, TITULO_MAX - 1)}…` : t;
-  return `${i.estrela ? "★ " : ""}<a href="${productUrl(i.asin)}">${esc(nome)}</a>`;
-};
+const corta = (t: string): string => (t.length > TITULO_MAX ? `${t.slice(0, TITULO_MAX - 1)}…` : t);
+
+/** Item em duas linhas: bullet (★ se prioridade) com o título como link e, recuada, a linha de preço. */
+const bloco = (asin: string, titulo: string | null, estrela: boolean, detalhe: string): string =>
+  `${estrela ? "★" : "•"} <a href="${productUrl(asin)}">${esc(corta((titulo ?? asin).trim()))}</a>\n   └ ${detalhe}`;
+
+const link = (i: PanelItem, detalhe: string): string => bloco(i.asin, i.titulo, i.estrela, detalhe);
 
 /** Estrela primeiro; dentro de cada faixa vale a ordem do critério (sort é estável). */
 const estrelaPrimeiro = (a: PanelItem, b: PanelItem): number => Number(b.estrela) - Number(a.estrela);
@@ -38,13 +40,13 @@ const estrelaPrimeiro = (a: PanelItem, b: PanelItem): number => Number(b.estrela
 function secao(titulo: string, linhas: string[], vazio: string): string[] {
   const out = [`<b>${titulo}</b>`];
   if (!linhas.length) out.push(`<i>${vazio}</i>`);
-  else out.push(...linhas);
+  else linhas.forEach((l, k) => out.push(...(k ? ["", l] : [l])));
   return out;
 }
 
 function limita<T>(xs: T[], f: (x: T) => string): string[] {
   const out = xs.slice(0, MAX_POR_SECAO).map(f);
-  if (xs.length > MAX_POR_SECAO) out.push(`<i>… e mais ${xs.length - MAX_POR_SECAO}. Veja o restante no painel.</i>`);
+  if (xs.length > MAX_POR_SECAO) out.push(`<i>e mais ${xs.length - MAX_POR_SECAO} no painel</i>`);
   return out;
 }
 
@@ -108,15 +110,15 @@ export function resumoMensagens(store: Store, now: Date): string[] {
   ];
   const blocos: string[][] = [
     cab,
-    secao("✅ Dentro do alvo", limita(dentro, (i) => `${link(i)} — <b>${money(i.menor)}</b> (alvo ${money(i.alvo)})`), "Nenhum item dentro do alvo agora."),
-    secao("📉 Maiores quedas (7 dias)", limita(quedas, (i) => `${link(i)} — <b>${money(i.menor)}</b> (${pct(queda(i)!)})`), "Nenhuma queda recente."),
-    secao("🎯 Mais perto do alvo", limita(perto, (i) => `${link(i)} — <b>${money(i.menor)}</b> (alvo ${money(i.alvo)}, ${pct(dist(i)!)})`), "Nenhum item com alvo acima do preço."),
+    secao("✅ Dentro do alvo", limita(dentro, (i) => link(i, `<b>${money(i.menor)}</b> · alvo ${money(i.alvo)}`)), "Nenhum item dentro do alvo agora."),
+    secao("📉 Maiores quedas (7 dias)", limita(quedas, (i) => link(i, `<b>${money(i.menor)}</b> · ${pct(queda(i)!)} em 7 dias`)), "Nenhuma queda recente."),
+    secao("🎯 Mais perto do alvo", limita(perto, (i) => link(i, `<b>${money(i.menor)}</b> · alvo ${money(i.alvo)} · ${pct(dist(i)!)} acima`)), "Nenhum item com alvo acima do preço."),
     secao(
       "✦ Sugestões: vendido e entregue pela Amazon",
       limita(
         sugs,
         (s) =>
-          `<a href="${productUrl(s.asin)}">${esc((s.titulo ?? s.asin).slice(0, TITULO_MAX))}</a> — <b>${money(s.preco)}</b> (para o item #${s.origem.num}${s.formato ? `, ${esc(s.formato)}` : ""}${s.certeza === "baixa" ? ", confira se é o mesmo produto" : ""})`,
+          bloco(s.asin, s.titulo, false, `<b>${money(s.preco)}</b> · para o item #${s.origem.num}${s.formato ? ` · ${esc(s.formato)}` : ""}${s.certeza === "baixa" ? " · confira se é o mesmo produto" : ""}`),
       ),
       "Nenhuma sugestão pendente.",
     ),
