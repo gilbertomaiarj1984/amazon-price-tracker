@@ -149,6 +149,24 @@ crontab -l; ls /home/deploy/garimpo/.github/workflows 2>/dev/null
 
 Se aparecer um script de deploy que copia o Caddyfile do repositório, a correção na origem é colocar o bloco do painel (com o hash) no Caddyfile versionado do garimpo.
 
+### Correção na origem (bloco em arquivo que o deploy não toca)
+
+Evidência (VPS, 2026-10-27): o deploy do garimpo de 26/10 19:36 trocou `docker-compose.yml`, `.env` e `remote-deploy.sh`, e os backups do Caddyfile de antes do bloco e de antes de cada restauração têm o mesmo tamanho (6980 bytes): o Caddyfile do repositório do garimpo não tem o bloco e é copiado por cima a cada deploy.
+
+Solução: o bloco fica em `~/garimpo/sites/precos.caddy` (arquivo que o deploy não copia) e o Caddyfile do repositório do garimpo só importa o diretório. Mudança no repositório do garimpo, por decisão do dono:
+
+1. Caddyfile do garimpo, no fim do arquivo (depois de qualquer bloco de opções globais): `import /etc/caddy/sites/*.caddy`
+2. `docker-compose.yml` do garimpo, serviço `caddy`, em `volumes`: `- ./sites:/etc/caddy/sites:ro`
+3. No VPS, **antes** de publicar a mudança:
+
+```sh
+mkdir -p /home/deploy/garimpo/sites
+awk '/^precos\.143-95-214-240\.sslip\.io/ {f=1} f {print} f && /^}/ {exit}' /home/deploy/garimpo/Caddyfile > /home/deploy/garimpo/sites/precos.caddy
+cat /home/deploy/garimpo/sites/precos.caddy      # confira: abre e fecha chaves, tem o basic_auth
+```
+
+`scripts/restaurar-painel.sh` reconhece o bloco em `sites/*.caddy` quando o Caddyfile tem o `import`, então não acrescenta duplicata. Para desfazer, tire as duas linhas do repositório do garimpo e apague `sites/`.
+
 ## Desligar
 
 Remova o bloco do Caddyfile e recarregue o Caddy. Para tirar o painel do rastreador, apague as duas linhas `PANEL_*` do `docker-compose.yml` e rode `docker compose up -d`.

@@ -24,7 +24,15 @@ http() { curl -s -o /dev/null -m 15 -w '%{http_code}' "https://$DOMINIO/api/iten
 
 [ -f "$CADDYFILE" ] || { log "ERRO: $CADDYFILE não existe"; exit 1; }
 
-if grep -qE "^${DOMINIO//./\\.}[[:space:]]*\{" "$CADDYFILE"; then
+SITES="$(dirname "$CADDYFILE")/sites"
+RE_BLOCO="^${DOMINIO//./\\.}[[:space:]]*\\{"
+# O bloco pode estar no próprio Caddyfile ou em sites/*.caddy, desde que o Caddyfile importe esse diretório.
+bloco_presente() {
+  grep -qE "$RE_BLOCO" "$CADDYFILE" && return 0
+  grep -qE '^[[:space:]]*import[[:space:]]+.*sites/' "$CADDYFILE" && grep -qsE "$RE_BLOCO" "$SITES"/*.caddy
+}
+
+if bloco_presente; then
   code="$(http)"
   if [ "$code" = "401" ] || [ "$code" = "200" ]; then say "ok: bloco presente e painel responde HTTP $code"; exit 0; fi
   log "bloco presente, mas o painel respondeu '${code:-sem resposta}'; recarregando o Caddy uma vez"
