@@ -12,6 +12,7 @@ services:
     environment:
       PANEL_PORT: "8787"
       PANEL_HOST: "0.0.0.0"
+      PANEL_PUBLIC_URL: "https://precos.143-95-214-240.sslip.io"
     networks:
       - default
       - proxy

@@ -83,6 +83,72 @@ Abra https://precos.143-95-214-240.sslip.io; o navegador pede usuário e senha. 
 
 Obs.: dentro da rede `proxy` o nome `tracker` pode colidir com outro container. Se o Caddy não achar o painel, use `price-tracker-tracker-1:8787` no `reverse_proxy`.
 
+## Painel fora do ar (o bloco some do Caddyfile)
+
+**Sintoma:** o navegador mostra `ERR_SSL_PROTOCOL_ERROR`. **Causa:** o bloco `precos...` desaparece de `/home/deploy/garimpo/Caddyfile` (o deploy do garimpo regrava o arquivo inteiro). Sem o bloco o Caddy não tem certificado para o endereço e recusa o TLS. O tracker está saudável o tempo todo.
+
+### Opções comparadas
+
+| Opção | Resolve? | Custo |
+|---|---|---|
+| Arquivo separado + `import sites/*.caddy` | Só se o deploy do garimpo preservar a linha `import` e o diretório estiver montado no container. Se o garimpo regrava o Caddyfile inteiro, a linha `import` some do mesmo jeito. | Mexe no compose do garimpo (fora deste repositório) |
+| Caddy próprio do tracker | Não é viável: o Let's Encrypt precisa das portas 80/443, que o Caddy do garimpo já ocupa, e este projeto não pode publicar portas. | Quebra o isolamento |
+| **Recomendada: auto-reparo + alerta** | Sim, mesmo que o garimpo continue sobrescrevendo o arquivo: em até 5 minutos o bloco volta sozinho (com backup, validação e reload), e o Telegram avisa se continuar fora. | Só arquivos deste projeto + 1 linha de cron do `deploy` |
+| Correção na origem | Definitiva de verdade: o deploy do garimpo deixar de apagar o bloco (ex.: versionar o bloco no Caddyfile do repositório do garimpo). | Mudança no garimpo, por decisão do dono |
+
+A recomendada convive com a correção na origem: quando o garimpo parar de apagar o bloco, o script simplesmente não tem nada a fazer.
+
+### Peça 1: o app avisa no Telegram
+
+O `docker-compose.yml` define `PANEL_PUBLIC_URL`. A cada 5 minutos o app pede `/api/itens` ao endereço público; `401` (pede login) ou `200` é "no ar". Depois de **2 checagens seguidas** com falha (erro de TLS, 404, 5xx) manda uma mensagem de queda e, quando volta, outra de volta. Não usa token nem senha. Para desligar, deixe `PANEL_PUBLIC_URL` vazio no `.env`.
+
+### Peça 2: `scripts/restaurar-painel.sh` (auto-reparo)
+
+Se o bloco existe e o painel responde, não faz nada. Se o bloco sumiu: copia `Caddyfile.bak-restaurar-DATA`, acrescenta o bloco (sem trocar o arquivo, para não mudar o inode que o container enxerga), valida com `caddy validate`, **reverte sozinho se for inválido**, recarrega o Caddy e confere o HTTP 401. O hash da senha vem de `~/.painel-caddy-hash` ou do último `Caddyfile.bak-*` que tenha o bloco.
+
+Instalação (VPS, usuário `deploy`):
+
+```sh
+cd ~/price-tracker-spike/amazon-price-tracker
+git pull --ff-only
+docker compose up -d --build
+
+# 1. Guarde o hash da senha num arquivo só seu (só o hash, uma linha). Pegue-o do bloco atual/backup:
+awk '/^precos\.143-95-214-240\.sslip\.io/ {f=1} f && /basic_?auth/ {a=1; next} f && a && NF>=2 {print $2; exit}' /home/deploy/garimpo/Caddyfile > ~/.painel-caddy-hash
+# Se o bloco estiver ausente agora, use o backup mais recente que o tenha:
+#   for b in $(ls -t /home/deploy/garimpo/Caddyfile.bak-*); do h=$(awk '/^precos\.143-95-214-240\.sslip\.io/ {f=1} f && /basic_?auth/ {a=1; next} f && a && NF>=2 {print $2; exit}' "$b"); [ -n "$h" ] && { echo "$h" > ~/.painel-caddy-hash; echo "de $b"; break; }; done
+chmod 600 ~/.painel-caddy-hash
+wc -c ~/.painel-caddy-hash        # deve ter ~60 bytes (começa com $2a$)
+
+# 2. Teste sem alterar nada:
+bash scripts/restaurar-painel.sh --dry
+bash scripts/restaurar-painel.sh
+
+# 3. Agende a cada 5 minutos (cron do usuário deploy; reversível com `crontab -e`):
+crontab -l 2>/dev/null > ~/crontab.bak-painel
+( crontab -l 2>/dev/null; echo '*/5 * * * * /home/deploy/price-tracker-spike/amazon-price-tracker/scripts/restaurar-painel.sh --cron >> /home/deploy/painel-restaurar.log 2>&1' ) | crontab -
+crontab -l
+```
+
+Desfazer: `crontab ~/crontab.bak-painel` (ou `crontab -r` se não havia cron antes) e apague `~/.painel-caddy-hash`.
+
+Acompanhar: `tail -20 ~/painel-restaurar.log` (o modo `--cron` só escreve quando precisa agir). Se a rede do container não alcançar o próprio IP público, a peça 1 acusa falso alarme; teste com `docker exec price-tracker-tracker-1 wget -qO- --spider https://precos.143-95-214-240.sslip.io/api/itens` (um `401` já é sucesso).
+
+### Descobrir o que sobrescreve o Caddyfile do garimpo
+
+Comandos só de leitura (VPS):
+
+```sh
+ls -la --time=ctime /home/deploy/garimpo/Caddyfile*
+stat -c '%n %i %y' /home/deploy/garimpo/Caddyfile        # inode e data da última alteração
+cd /home/deploy/garimpo && git log --oneline -5 -- Caddyfile
+git -C /home/deploy/garimpo status --short | head
+grep -rn "Caddyfile" /home/deploy/garimpo --include='*.sh' --include='*.yml' --include='*.yaml' --include='Makefile' 2>/dev/null | head -20
+crontab -l; ls /home/deploy/garimpo/.github/workflows 2>/dev/null
+```
+
+Se aparecer um script de deploy que copia o Caddyfile do repositório, a correção na origem é colocar o bloco do painel (com o hash) no Caddyfile versionado do garimpo.
+
 ## Desligar
 
 Remova o bloco do Caddyfile e recarregue o Caddy. Para tirar o painel do rastreador, apague as duas linhas `PANEL_*` do `docker-compose.yml` e rode `docker compose up -d`.

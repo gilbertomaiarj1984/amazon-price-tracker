@@ -9,6 +9,7 @@ import { loadConfig } from "./config.ts";
 import { Store } from "./db.ts";
 import { MAX_BODY, panelHandler } from "./panel.ts";
 import { marcarResumo, resumoDevido, resumoMensagens } from "./resumo.ts";
+import { VIGIA_INICIAL, avaliarVigia, painelNoAr } from "./vigia-painel.ts";
 import { runVarredura, varreduraDevida } from "./sugestoes.ts";
 import { createLock } from "./mutex.ts";
 import { loop, msToNextSlot, runCycle } from "./scheduler.ts";
@@ -174,6 +175,21 @@ if (cfg.resumoHoras) {
   };
   // Acorda nos slots :00 e :30; o primeiro é o próximo da grade, então subir ou reiniciar o app não envia nada.
   void loop(resumo, { intervalMs: 30 * 60_000, firstDelayMs: msToNextSlot(Date.now(), 30) + 5_000, nextDelayMs: () => msToNextSlot(Date.now(), 30) + 5_000, jitterMs: () => 0, sleep, signal: ac.signal, log });
+}
+
+if (cfg.panelPublicUrl) {
+  const url = cfg.panelPublicUrl;
+  let vigia = VIGIA_INICIAL;
+  // Exceção ao ALERTAS_APENAS_ALVO: painel fora do ar é falha de infraestrutura, avisa uma vez ao cair e uma ao voltar.
+  const vigiar = async () => {
+    const r = await painelNoAr(url);
+    const { next, acao } = avaliarVigia(vigia, r.ok);
+    vigia = next;
+    if (!r.ok) log(`painel público fora do ar (${r.detalhe}), ${next.falhas} checagem(ns) seguida(s)`);
+    if (acao === "avisar_queda") await send(`<b>Painel fora do ar</b> (${esc(r.detalhe)}): ${esc(url)}\nProvável causa: o bloco do painel sumiu do Caddyfile do garimpo. No VPS: <code>bash ~/price-tracker-spike/amazon-price-tracker/scripts/restaurar-painel.sh</code>`).catch((e) => log(`aviso do painel não enviado: ${(e as Error).message}`));
+    if (acao === "avisar_volta") await send("<b>Painel de volta ao ar.</b>").catch((e) => log(`aviso do painel não enviado: ${(e as Error).message}`));
+  };
+  void loop(vigiar, { intervalMs: 5 * 60_000, firstDelayMs: 90_000, jitterMs: () => 0, sleep, signal: ac.signal, log });
 }
 
 const stop = () => {

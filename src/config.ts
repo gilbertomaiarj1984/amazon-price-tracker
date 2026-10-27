@@ -11,6 +11,8 @@ export interface Config {
   panelToken: string | null;
   /** Token da API do userscript (/api/us/*: ver item, definir alvo, rastrear). Sem USERSCRIPT_TOKEN, desligada. */
   userscriptToken: string | null;
+  /** URL pública do painel (PANEL_PUBLIC_URL). Se definida, o app confere a cada 5 min e avisa no Telegram quando cair. */
+  panelPublicUrl: string | null;
   /** PANEL_READONLY=1 desliga as ações de escrita do painel (cadastrar, alvo, pausar, linhas, remover). */
   panelReadonly: boolean;
   /** ALERTAS_APENAS_ALVO (padrão ligado; =0 desliga): o bot só avisa por conta própria de item dentro do alvo. */
@@ -68,6 +70,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     reqMinMs,
     reqMaxMs,
     panelReadonly: /^(1|true|sim)$/i.test(env["PANEL_READONLY"]?.trim() ?? ""),
+    panelPublicUrl: env["PANEL_PUBLIC_URL"]?.trim() || null,
     userscriptToken: usToken || null,
     panelToken: env["PANEL_TOKEN"]?.trim() || null,
     panel: env["PANEL_PORT"]?.trim() ? { host: env["PANEL_HOST"]?.trim() || "127.0.0.1", port: intOf(env, "PANEL_PORT", 0, 1) } : null,
