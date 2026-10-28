@@ -104,7 +104,7 @@ O `docker-compose.yml` define `PANEL_PUBLIC_URL`. A cada 5 minutos o app pede `/
 
 ### Peça 2: `scripts/restaurar-painel.sh` (auto-reparo)
 
-Se o bloco existe e o painel responde, não faz nada. Se o bloco sumiu: copia `Caddyfile.bak-restaurar-DATA`, acrescenta o bloco (sem trocar o arquivo, para não mudar o inode que o container enxerga), valida com `caddy validate`, **reverte sozinho se for inválido**, recarrega o Caddy e confere o HTTP 401. O hash da senha vem de `~/.painel-caddy-hash` ou do último `Caddyfile.bak-*` que tenha o bloco.
+Se o bloco existe e o painel responde, não faz nada. Se o bloco sumiu: copia `Caddyfile.bak-restaurar-DATA`, acrescenta o bloco (sem trocar o arquivo, para não mudar o inode que o container enxerga), valida com `caddy validate`, **reverte sozinho se for inválido**, recarrega o Caddy e confere o HTTP 401. O bloco recolocado é cópia de `~/garimpo/sites/precos.caddy` (ou `~/.painel-caddy-bloco`) se existir, com as rotas `/api/selo/*` e `/api/us/*` liberadas do login (userscript, token próprio); sem esse arquivo, usa um modelo equivalente com o hash de `~/.painel-caddy-hash` ou do último `Caddyfile.bak-*` que tenha o bloco.
 
 Instalação (VPS, usuário `deploy`):
 
