@@ -45,15 +45,21 @@ fi
 
 log "bloco de $DOMINIO AUSENTE em $CADDYFILE; restaurando"
 
+# Fonte preferida do bloco: um arquivo guardado (padrão sites/precos.caddy ou ~/.painel-caddy-bloco), copiado como está.
+BLOCOFILE=""
+for f in "${PAINEL_BLOCO:-}" "$SITES/precos.caddy" "$HOME/.painel-caddy-bloco"; do
+  [ -n "$f" ] && [ -f "$f" ] && grep -qE "$RE_BLOCO" "$f" && { BLOCOFILE="$f"; break; }
+done
+
 hash="${PAINEL_HASH:-}"
 [ -z "$hash" ] && [ -f "$HASHFILE" ] && hash="$(head -n1 "$HASHFILE" | tr -d '[:space:]')"
-if [ -z "$hash" ]; then
+if [ -z "$hash" ] && [ -z "$BLOCOFILE" ]; then
   for bak in $(ls -t "$CADDYFILE".bak-* 2>/dev/null); do
     hash="$(awk -v d="$DOMINIO" '$1==d {f=1} f && /basic_?auth/ {a=1; next} f && a && NF>=2 {print $2; exit}' "$bak")"
     [ -n "$hash" ] && { log "hash lido de $bak"; break; }
   done
 fi
-[ -n "$hash" ] || { log "ERRO: sem hash. Gere com: docker run --rm -it caddy:2-alpine caddy hash-password  e grave em $HASHFILE (chmod 600)"; exit 1; }
+[ -n "$hash" ] || [ -n "$BLOCOFILE" ] || { log "ERRO: sem hash. Gere com: docker run --rm -it caddy:2-alpine caddy hash-password  e grave em $HASHFILE (chmod 600)"; exit 1; }
 
 if [ "$MODO" = "--dry" ]; then log "(dry) acrescentaria o bloco de $DOMINIO a $CADDYFILE"; exit 0; fi
 
@@ -62,7 +68,12 @@ cp -p "$CADDYFILE" "$backup" || { log "ERRO: sem backup, abortando"; exit 1; }
 log "backup: $backup"
 
 # Acrescenta (>>) em vez de substituir o arquivo: mantém o mesmo inode, que é o que o container enxerga.
-cat >> "$CADDYFILE" <<BLOCO
+if [ -n "$BLOCOFILE" ]; then
+  log "bloco copiado de $BLOCOFILE"
+  { echo; echo "# Rastreador de preços - bloco gerenciado por scripts/restaurar-painel.sh"; cat "$BLOCOFILE"; } >> "$CADDYFILE"
+else
+  # Mesmo desenho do bloco publicado: /api/selo e /api/us (userscript, com token próprio) passam sem login.
+  cat >> "$CADDYFILE" <<BLOCO
 
 # Rastreador de preços (projeto price-tracker; rede externa proxy) - bloco gerenciado por scripts/restaurar-painel.sh
 $DOMINIO {
@@ -72,12 +83,19 @@ $DOMINIO {
                 Referrer-Policy "no-referrer"
                 -Server
         }
-        basic_auth {
-                $USUARIO $hash
+        @selo path /api/selo/* /api/us/*
+        handle @selo {
+                reverse_proxy $UPSTREAM
         }
-        reverse_proxy $UPSTREAM
+        handle {
+                basic_auth {
+                        $USUARIO $hash
+                }
+                reverse_proxy $UPSTREAM
+        }
 }
 BLOCO
+fi
 
 if ! docker exec "$CONTAINER" caddy validate --config /etc/caddy/Caddyfile >/dev/null 2>&1; then
   log "ERRO: Caddyfile inválido depois de acrescentar; revertendo para o backup (sem recarregar)"
