@@ -14,7 +14,7 @@ Cada produto tem até três **linhas de preço**, cada uma com histórico própr
 |---|---|
 | **Amazon** (principal) | Oferta vendida pela própria Amazon. Fica sem dado quando a Amazon não vende; nunca é preenchida com preço de terceiro na série. Nesse caso o card, o painel e os alertas mostram o **melhor terceiro novo** (rotulado "Terceiro", com vendedor e FBA ou não), o alvo do item vale para ele, e ele é gravado na série Terceiros. Não custa requisição extra: o painel de ofertas já é lido sempre que a caixa de compra não é da Amazon. |
 | **Terceiros (novo)** | Menor preço anunciado entre vendedores terceiros, condição nova. |
-| **Usado** | Menor preço anunciado entre ofertas usadas. |
+| ~~Usado~~ | Descontinuada: o rastreador considera só ofertas novas (usado, recondicionado e "de colecionador" são ignorados). |
 
 **O frete não entra na conta.** No HTML ele vem vazio (carregado depois e dependente do CEP), e o texto "Entrega GRÁTIS" é promoção condicional. Os preços são os anunciados na página. Alguns vendedores destacam o preço **à vista no Pix** (cerca de 10% abaixo); o sistema usa o preço em destaque, que pode ser esse.
 
@@ -29,7 +29,7 @@ src/telegram.ts       cliente mínimo da Bot API
 src/amazon/asin.ts    link -> ASIN (resolve amzn.to / a.co só entre hosts conhecidos)
 src/amazon/fetch.ts   requisição com User-Agent, jitter e timeout
 src/amazon/parse.ts   página do produto, painel de ofertas, detecção de captcha/bloqueio
-src/lines.ts          ofertas -> linhas Amazon / Terceiros / Usado
+src/lines.ts          ofertas novas -> linhas Amazon / Terceiros
 src/alerts.ts         quando avisar (alvo, novo mínimo, "voltou a vender", falhas seguidas)
 src/db.ts             SQLite (bun:sqlite)
 scripts/spike.ts      teste de bloqueio, para rodar no VPS

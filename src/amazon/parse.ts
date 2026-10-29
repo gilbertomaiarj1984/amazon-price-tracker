@@ -196,7 +196,9 @@ function parseFrete(block: HTMLElement): number | null {
   return m ? parseBRL(m[1] ?? m[2]) : null;
 }
 
-const USED_RE = /usad|recondicion|seminov|como novo|muito bom|bom estado|aceit[aá]vel/i;
+/** Só "Novo" conta. O título da oferta é "Novo", "Usado - Bom", "De colecionador - Bom"...; "Compra única" é tipo de compra (novo). */
+const NEW_HEADING_RE = /^(novo\b|compra [uú]nica)/i;
+const USED_RE = /usad|recondicion|seminov|colecionador|como novo|muito bom|bom estado|aceit[aá]vel|\b(?:bom|muito bom|aceit[aá]vel)\b/i;
 const RETURN_POLICY_RE = /pol[ií]tica de devolu/i;
 
 /** Primeiro texto útil de um bloco "Enviado pela / Vendido por": o nome vem em <span> (Amazon) ou <a> (terceiro). */
@@ -224,7 +226,7 @@ export function parseOffersPanel(html: string): Offer[] {
     const soldBy = valueOf(b, "aod-offer-soldBy") || "Desconhecido";
     const shipsFrom = valueOf(b, "aod-offer-shipsFrom");
     const heading = txt(b.querySelector('[id="aod-offer-heading"]'));
-    const condicao: Offer["condicao"] = USED_RE.test(heading) ? "usado" : "novo";
+    const condicao: Offer["condicao"] = heading && (USED_RE.test(heading) || !NEW_HEADING_RE.test(heading)) ? "usado" : "novo";
     const frete = parseFrete(b);
     const key = `${soldBy}|${condicao}|${preco}|${frete}`;
     if (seen.has(key)) continue;

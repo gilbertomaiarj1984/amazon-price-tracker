@@ -453,7 +453,7 @@ async function itemWrite(d: PanelDeps, act: Actions, method: string, p: Product,
       return detail();
     }
     case "linhas": {
-      const linha = lineOf(body["linha"], ["terceiros", "usado"]) as "terceiros" | "usado";
+      const linha = lineOf(body["linha"], ["terceiros"]) as "terceiros";
       const on = bool(body["ligada"], "ligada");
       act.setLinha(p, linha, on);
       const lida = on ? await act.collectNow(p) : null;

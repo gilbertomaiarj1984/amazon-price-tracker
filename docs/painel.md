@@ -1,6 +1,6 @@
 # Painel web
 
-Painel com tudo o que o bot do Telegram faz, mais a leitura: lista de itens (mini-gráfico), histórico de 7/14/30 dias (linhas Amazon, Terceiros e Usado, com faixa cinza quando a Amazon não vendeu), tabela de ofertas da última coleta e a saúde das coletas. Lê e altera o mesmo SQLite do bot. Não faz login na Amazon.
+Painel com tudo o que o bot do Telegram faz, mais a leitura: lista de itens (mini-gráfico), histórico de 7/14/30 dias (linhas Amazon e Terceiros, com faixa cinza quando a Amazon não vendeu), tabela de ofertas da última coleta e a saúde das coletas. Lê e altera o mesmo SQLite do bot. Não faz login na Amazon.
 
 ## O que dá para fazer no site (equivale ao bot)
 
@@ -9,8 +9,8 @@ Painel com tudo o que o bot do Telegram faz, mais a leitura: lista de itens (min
 | colar um link (ou vários, até 20) | caixa **Rastrear produtos** na lista; sugere alvo −5/−10/−15% ou valor livre |
 | `/lista` | a própria lista, com preço atual, alvo e mini-gráfico |
 | `/historico N` | clicar no item: gráfico de 7/14/30 dias, mínimo, máximo, variação |
-| `/linhas N` | **Linhas de preço**: ligar/desligar Terceiros e Usado (lê o produto na hora) |
-| `/alvo N valor` | **Preço-alvo** único do item (vale para Amazon, Terceiros e Usado), com campo para salvar e botão para remover |
+| `/linhas N` | **Linhas de preço**: ligar/desligar Terceiros (lê o produto na hora) |
+| `/alvo N valor` | **Preço-alvo** único do item (vale para Amazon e Terceiros, só produtos novos), com campo para salvar e botão para remover |
 | `/pausar N` | **Pausar/Retomar coletas** |
 | `/estrela N` | **Estrela de prioridade** (coletado primeiro em cada rodada) |
 | botão **Consultar agora** (também no card do `/item N`) | Lê a Amazon na hora, só aquele item |

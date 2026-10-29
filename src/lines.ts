@@ -49,14 +49,14 @@ export interface Derived {
 }
 
 /**
- * Uma série por tipo de oferta. A linha Amazon só existe quando a própria Amazon
+ * Só ofertas em condição Nova entram (usado, recondicionado e "de colecionador" ficam de fora). Uma série por fonte. A linha Amazon só existe quando a própria Amazon
  * vende: nunca é preenchida com preço de terceiro. Sem Amazon, `fallback` traz o melhor
  * terceiro novo (só para exibir e alertar) e ele também é gravado na série Terceiros.
  */
 export function deriveLines(
   page: ProductPage,
   offers: Offer[],
-  enabled: { terceiros: boolean; usado: boolean },
+  enabled: { terceiros: boolean },
 ): Derived {
   const points: Derived["points"] = {};
   const descartadas: Offer[] = [];
@@ -86,13 +86,6 @@ export function deriveLines(
       fallback = { preco: page.buyBox, vendedor, envio: null };
       points.terceiros = { linha: "terceiros", preco: page.buyBox, vendedor };
     }
-  }
-  if (enabled.usado) {
-    const usados = offers.filter((o) => o.condicao === "usado");
-    const { ok, descartadas: d } = dropSuspects(usados);
-    descartadas.push(...d);
-    const best = cheapest(ok);
-    if (best) points.usado = { linha: "usado", preco: total(best), vendedor: best.vendedor };
   }
   return { points, descartadas, fallback };
 }

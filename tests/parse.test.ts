@@ -157,6 +157,20 @@ describe("parseOffersPanel", () => {
   });
 });
 
+describe("condição da oferta: só Novo conta", () => {
+  const um = (titulo: string) =>
+    '<div id="aod-offer"><div id="aod-offer-heading"><span>' + titulo + '</span></div><div id="aod-offer-price"><span id="aod-price-0"><span class="aok-offscreen apex-pricetopay-accessibility-label">R$ 66,50</span></span></div><div id="aod-offer-soldBy"><div class="a-col-right"><a>Livros Karatis</a></div></div><div id="aod-offer-shipsFrom"><div class="a-col-right"><span>Livros Karatis</span></div></div></div>' + "x".repeat(600);
+  test.each([["Usado - Bom"], ["De colecionador - Bom"], ["De colecionador - Muito bom"], ["Recondicionado - Excelente"], ["Usado - Aceitável"]])("%s é usado", (t) => {
+    expect(parseOffersPanel(um(t))[0]?.condicao).toBe("usado");
+  });
+  test.each([["Novo"], ["Compra única"], ["Novo - Entrega em 3 dias"]])("%s é novo", (t) => {
+    expect(parseOffersPanel(um(t))[0]?.condicao).toBe("novo");
+  });
+  test("título desconhecido não é tratado como novo", () => {
+    expect(parseOffersPanel(um("Condição especial"))[0]?.condicao).toBe("usado");
+  });
+});
+
 describe("detectBlock", () => {
   test("ok", () => expect(detectBlock(fx("product-amazon.html"), 200)).toBe("ok"));
   test("captcha", () => expect(detectBlock(fx("captcha.html"), 200)).toBe("captcha"));

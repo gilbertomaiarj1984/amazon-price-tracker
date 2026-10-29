@@ -127,7 +127,7 @@ export class Actions {
     return n;
   }
 
-  setLinha(p: Product, k: "terceiros" | "usado", on: boolean): void {
+  setLinha(p: Product, k: "terceiros", on: boolean): void {
     this.store.setLinhaOn(p.id, k, on);
   }
 
