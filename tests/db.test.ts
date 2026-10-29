@@ -113,6 +113,24 @@ describe("grupos e migração", () => {
     require("node:fs").rmSync(path);
   });
 
+  test("Terceiros vem ligado por padrão; banco antigo é ligado uma só vez", () => {
+    const { Database } = require("bun:sqlite");
+    const path = `${require("node:os").tmpdir()}/mig-terc-${Date.now()}.db`;
+    const old = new Database(path, { create: true });
+    old.exec("CREATE TABLE products (id INTEGER PRIMARY KEY AUTOINCREMENT, asin TEXT NOT NULL UNIQUE, titulo TEXT, criado_em TEXT NOT NULL, pausado INTEGER NOT NULL DEFAULT 0, terceiros_on INTEGER NOT NULL DEFAULT 0, usado_on INTEGER NOT NULL DEFAULT 0, falhas_seguidas INTEGER NOT NULL DEFAULT 0, imagem TEXT); INSERT INTO products (asin, titulo, criado_em) VALUES ('B097BYXGXN', 'X', 't')");
+    old.close();
+    const s = new Store(path);
+    const a = s.getByAsin("B097BYXGXN")!;
+    expect([a.terceirosOn, a.usadoOn]).toEqual([true, false]);
+    expect(s.addProduct("B0ABCDEFGH", null, "t").terceirosOn).toBe(true);
+    s.setLinhaOn(a.id, "terceiros", false);
+    s.close();
+    const s2 = new Store(path);
+    expect(s2.getByAsin("B097BYXGXN")!.terceirosOn).toBe(false);
+    s2.close();
+    require("node:fs").rmSync(path);
+  });
+
   test("nome de grupo é único sem diferenciar maiúsculas; apagar solta os itens", () => {
     const s = new Store();
     const g = s.addGrupo("Fone", "t")!;

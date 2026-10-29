@@ -58,7 +58,7 @@ describe("cadastro por link", () => {
     expect(sent[1]!.html).toContain("Heinz Ketchup");
     expect(sent[1]!.html).toContain("#1 · B097BYXGXN");
     expect(sent[1]!.html).toContain("R$ 20,10");
-    expect(sent[1]!.html).toContain("Terceiros (novo)  <i>desligada</i>");
+    expect(sent[1]!.html).toContain("Terceiros (novo)  R$ 379,00");
     expect(last().html).toContain("preço-alvo");
     expect(cbs(last())).toEqual(["t:1:19", "t:1:18", "t:1:17", "nt:1"]);
   });
@@ -198,17 +198,18 @@ describe("comandos", () => {
     await bot.handleCallback("rm:1");
     expect(store.list()).toHaveLength(0);
   });
-  test("/linhas liga Terceiros e já lê o painel", async () => {
+  test("/linhas: Terceiros vem ligado; desliga e liga de novo já lendo o painel", async () => {
     await bot.handleText("/linhas 1");
     expect(cbs(last())).toEqual(["lg:1:terceiros", "lg:1:usado"]);
+    expect(store.getById(1)?.terceirosOn).toBe(true);
+    await bot.handleCallback("lg:1:terceiros");
+    expect(store.getById(1)?.terceirosOn).toBe(false);
+    expect(last().html).toContain("desligada");
     net.calls.length = 0;
     await bot.handleCallback("lg:1:terceiros");
     expect(store.getById(1)?.terceirosOn).toBe(true);
     expect(net.calls).toEqual(["produto", "painel"]);
     expect(last().html).toContain("TechBras Store");
-    await bot.handleCallback("lg:1:terceiros");
-    expect(store.getById(1)?.terceirosOn).toBe(false);
-    expect(last().html).toContain("desligada");
   });
   test("/ajuda, comando desconhecido e texto solto", async () => {
     await bot.handleText("/ajuda");

@@ -13,11 +13,17 @@ beforeEach(() => {
   store = new Store(":memory:");
 });
 const add = () => store.addProduct("B097BYXGXN", null, "2026-10-23T00:00:00.000Z");
+/** Item com Terceiros desligado (o padrão de um item novo é ligado). */
+const addOff = () => {
+  const p = add();
+  store.setLinhaOn(p.id, "terceiros", false);
+  return store.getById(p.id)!;
+};
 
 describe("collectOne", () => {
   test("Amazon vende e só ela está ligada: 1 requisição, grava a linha e o título", async () => {
     const net = fakeNet();
-    const p = add();
+    const p = addOff();
     const r = await collectOne(store, p, net.deps);
     expect(r.ok).toBe(true);
     expect(net.calls).toEqual(["produto"]);
@@ -39,13 +45,13 @@ describe("collectOne", () => {
 
   test("buy box de terceiro com outras opções: busca o painel para ver se a Amazon vende", () => {
     const page = { titulo: "x", buyBox: 100, buyBoxVendedor: "Loja", vendidoPorAmazon: false, outrasAPartirDe: 90, outrasOpcoes: 3, disponivel: true };
-    expect(needsPanel(add(), page)).toBe(true);
+    expect(needsPanel(addOff(), page)).toBe(true);
     // Sem a contagem "N opções" na página, a Amazon ainda pode vender fora da caixa de compra (caso do B00C061HZY).
-    expect(needsPanel(add(), { ...page, outrasOpcoes: null })).toBe(true);
-    expect(needsPanel(add(), { ...page, vendidoPorAmazon: true })).toBe(false);
+    expect(needsPanel(addOff(), { ...page, outrasOpcoes: null })).toBe(true);
+    expect(needsPanel(addOff(), { ...page, vendidoPorAmazon: true })).toBe(false);
     // Amazon Global na caixa de compra: a Amazon.com.br pode estar mais barata no painel, mesmo sem contagem de opções.
     const global = { ...page, buyBoxVendedor: "Amazon Global", vendidoPorAmazon: true, outrasOpcoes: null };
-    expect(needsPanel(add(), global)).toBe(true);
+    expect(needsPanel(addOff(), global)).toBe(true);
   });
 
   test("captcha: não grava preço e conta a falha", async () => {
@@ -178,7 +184,7 @@ describe("Amazon sem oferta: melhor terceiro", () => {
 
   test("usa a menor oferta nova (sem a suspeita), sem requisição extra e sem ligar Terceiros", async () => {
     const net = fakeNet(semAmazon());
-    const p = add();
+    const p = addOff();
     const r = await collectOne(store, p, net.deps);
     expect(net.calls).toEqual(["produto", "painel"]);
     expect(r.ok && r.points.amazon).toBeUndefined();
@@ -199,7 +205,7 @@ describe("Amazon sem oferta: melhor terceiro", () => {
 
   test("caixa de compra de terceiro mais barata que a Amazon conta para o alvo, mesmo com Terceiros desligado", async () => {
     const net = fakeNet({ product: fx("product-third-party.html").replace("R$ 389,00", "R$ 180,16"), panel: fx("offers-panel.html") });
-    const p = add();
+    const p = addOff();
     store.setAlvo(p.id, 200);
     const a = await collectOne(store, p, net.deps);
     expect(a.ok && a.points.amazon?.preco).toBe(389);

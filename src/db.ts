@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS products (
   titulo TEXT,
   criado_em TEXT NOT NULL,
   pausado INTEGER NOT NULL DEFAULT 0,
-  terceiros_on INTEGER NOT NULL DEFAULT 0,
+  terceiros_on INTEGER NOT NULL DEFAULT 1,
   usado_on INTEGER NOT NULL DEFAULT 0,
   falhas_seguidas INTEGER NOT NULL DEFAULT 0,
   estrela INTEGER NOT NULL DEFAULT 0
@@ -208,6 +208,14 @@ export class Store {
     if (!cols.some((c) => c.name === "estrela")) this.db.exec("ALTER TABLE products ADD COLUMN estrela INTEGER NOT NULL DEFAULT 0");
     if (!cols.some((c) => c.name === "grupo_id")) this.db.exec("ALTER TABLE products ADD COLUMN grupo_id INTEGER REFERENCES grupos(id) ON DELETE SET NULL");
     this.migrateAlvoGlobal();
+    this.migrateTerceirosLigado();
+  }
+
+  /** Terceiros passou a vir ligado por padrão: liga nos itens que já existiam, uma única vez (depois o usuário pode desligar). */
+  private migrateTerceirosLigado(): void {
+    if (this.getMeta("migr:terceiros_on_padrao")) return;
+    this.db.exec("UPDATE products SET terceiros_on = 1");
+    this.setMeta("migr:terceiros_on_padrao", "1");
   }
 
   /**
@@ -232,7 +240,7 @@ export class Store {
   }
 
   addProduct(asin: string, titulo: string | null, now: string): Product {
-    this.db.query("INSERT OR IGNORE INTO products (asin, titulo, criado_em) VALUES (?, ?, ?)").run(asin, titulo, now);
+    this.db.query("INSERT OR IGNORE INTO products (asin, titulo, criado_em, terceiros_on) VALUES (?, ?, ?, 1)").run(asin, titulo, now);
     return this.getByAsin(asin)!;
   }
 
