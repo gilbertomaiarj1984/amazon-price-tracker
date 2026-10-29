@@ -43,7 +43,7 @@ export type CollectOutcome =
  */
 export function needsPanel(p: Product, page: ProductPage): boolean {
   const global = /global/i.test(page.buyBoxVendedor ?? "");
-  return p.terceirosOn || p.usadoOn || !page.vendidoPorAmazon || global;
+  return p.terceirosOn || !page.vendidoPorAmazon || global;
 }
 
 let uaCounter = 0;
@@ -77,9 +77,9 @@ async function collectInner(store: Store, product: Product, deps: CollectDeps): 
   }
 
   const fresh = store.getById(product.id) ?? product;
-  const { points, descartadas, fallback } = deriveLines(parsed, offers, { terceiros: fresh.terceirosOn, usado: fresh.usadoOn });
+  const { points, descartadas, fallback } = deriveLines(parsed, offers, { terceiros: fresh.terceirosOn });
   const at = deps.now().toISOString();
-  const enabled = LINE_KEYS.filter((k) => k === "amazon" || (k === "terceiros" ? fresh.terceirosOn : fresh.usadoOn));
+  const enabled = LINE_KEYS.filter((k) => k === "amazon" || (k === "terceiros" && fresh.terceirosOn));
 
   const alertas: AlertItem[] = [];
   const candidatos: Candidato[] = [];

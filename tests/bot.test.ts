@@ -200,7 +200,7 @@ describe("comandos", () => {
   });
   test("/linhas: Terceiros vem ligado; desliga e liga de novo já lendo o painel", async () => {
     await bot.handleText("/linhas 1");
-    expect(cbs(last())).toEqual(["lg:1:terceiros", "lg:1:usado"]);
+    expect(cbs(last())).toEqual(["lg:1:terceiros"]);
     expect(store.getById(1)?.terceirosOn).toBe(true);
     await bot.handleCallback("lg:1:terceiros");
     expect(store.getById(1)?.terceirosOn).toBe(false);

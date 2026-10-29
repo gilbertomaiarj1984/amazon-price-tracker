@@ -27,7 +27,7 @@ export function card(v: ProductView): string {
     "",
     a.atual != null ? `<b>Amazon  ${money(a.atual)}</b>` : "<b>Amazon  sem oferta agora</b>",
   ];
-  for (const k of ["terceiros", "usado"] as const) {
+  for (const k of ["terceiros"] as const) {
     const l = v.linhas[k];
     if (l.automatico && a.atual == null)
       lines.push(`<b>${LINE_NAMES[k]}  ${money(l.atual)}</b>${l.ligada ? "" : " <i>(melhor terceiro, automático)</i>"}\n${terceiroTxt(l.vendedor, l.automatico.envio)}\n<i>A Amazon não vende este item agora; este preço não é da Amazon.</i>`);
@@ -62,8 +62,8 @@ export function history(v: ProductView): string {
 }
 
 export function lines(v: ProductView): string {
-  const out = [`<b>Linhas de preço · #${v.num}</b>`, "A Amazon é a linha principal e está sempre ligada. Terceiros e Usado dobram as requisições do item.", ""];
-  for (const k of ["terceiros", "usado"] as const) out.push(`${LINE_NAMES[k]}  ${v.linhas[k].ligada ? "ligada" : "<i>desligada</i>"}`);
+  const out = [`<b>Linhas de preço · #${v.num}</b>`, "A Amazon é a linha principal e está sempre ligada. Terceiros dobra as requisições do item.", ""];
+  for (const k of ["terceiros"] as const) out.push(`${LINE_NAMES[k]}  ${v.linhas[k].ligada ? "ligada" : "<i>desligada</i>"}`);
   return out.join("\n");
 }
 
@@ -112,8 +112,8 @@ export const HELP = `<b>Comandos</b>
 <code>/resumo</code>  dentro do alvo, maiores quedas, mais perto do alvo e sugestões (também chega sozinho 2x ao dia)
 <code>/item N</code>  card do item com foto, preço e botão Consultar agora
 <code>/historico N</code>  mínimo, máximo e variação
-<code>/linhas N</code>  liga ou desliga Terceiros e Usado
-<code>/alvo N valor</code>  alvo do item (vale para Amazon, Terceiros e Usado)
+<code>/linhas N</code>  liga ou desliga Terceiros (só ofertas novas)
+<code>/alvo N valor</code>  alvo do item (vale para Amazon e Terceiros, só novos)
 <code>/pausar N</code>  pausa ou retoma
 <code>/estrela N</code>  liga ou desliga a estrela (prioridade na coleta)
 <code>/remover N</code>  apaga o item e o histórico

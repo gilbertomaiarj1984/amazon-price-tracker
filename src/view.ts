@@ -26,7 +26,7 @@ export interface ProductView {
   linhas: Record<LineKey, LineView>;
   /** Alvo único do item, válido para qualquer fonte. */
   alvo: number | null;
-  /** Menor preço agora entre as fontes com oferta (Amazon, Terceiros, Usado). */
+  /** Menor preço agora entre as fontes com oferta (Amazon, Terceiros), só condição Nova. */
   menor: number | null;
   menorLinha: LineKey | null;
 }
@@ -35,7 +35,7 @@ export function buildView(store: Store, p: Product, now: Date): ProductView {
   const desde = new Date(now.getTime() - 30 * DAY_MS).toISOString();
   const linhas = {} as Record<LineKey, LineView>;
   for (const linha of LINE_KEYS) {
-    const ligada = linha === "amazon" || (linha === "terceiros" ? p.terceirosOn : p.usadoOn);
+    const ligada = linha === "amazon" || (linha === "terceiros" && p.terceirosOn);
     const st = store.lineStats(p.id, linha, desde);
     const last = store.lastPoint(p.id, linha);
     const disp = store.getAlertState(p.id, linha).disponivel;

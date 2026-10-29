@@ -88,7 +88,7 @@ const $=s=>document.querySelector(s);
 const brl=n=>n==null?'—':n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const pct=n=>(n>0?'+':n<0?'−':'')+Math.abs(n).toFixed(1).replace('.',',')+'%';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const COR={amazon:'var(--amz)',terceiros:'var(--ter)',usado:'var(--usa)'},NOME={amazon:'Amazon',terceiros:'Terceiros',usado:'Usado'},LK=['amazon','terceiros','usado'];
+const COR={amazon:'var(--amz)',terceiros:'var(--ter)',usado:'var(--usa)'},NOME={amazon:'Amazon',terceiros:'Terceiros',usado:'Usado'},LK=['amazon','terceiros'];
 const ago=t=>{if(!t)return 'nunca';const m=Math.round((Date.now()-Date.parse(t))/60000);return m<1?'agora':m<60?m+' min atrás':m<1440?Math.round(m/60)+' h atrás':Math.round(m/1440)+' d atrás'};
 const hhmm=t=>new Date(t).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
 const dm=t=>new Date(t).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
@@ -109,7 +109,7 @@ const MOTIVOS={captcha:'captcha da Amazon',http_503:'Amazon respondeu 503',http_
 const motivo=m=>MOTIVOS[m]||m||'motivo desconhecido';
 /* nunca = ainda sem leitura; erro = leitura falhou e nada foi gravado; ok = leu (a Amazon pode não ter oferta) */
 const lido=i=>i.linhas.amazon.coletas||(i.ultimaColeta&&i.ultimaColeta.ok)?'ok':i.ultimaColeta?'erro':'nunca';
-/* preço exibido: o menor entre as fontes com oferta (Amazon, Terceiros, Usado); o alvo é um só e vale para qualquer fonte */
+/* preço exibido: o menor entre as fontes com oferta (Amazon, Terceiros); o alvo é um só e vale para qualquer fonte */
 const ap=i=>i.menor;
 function atualiz(i){const u=i.ultimaColeta;if(!u)return '<span class="mut">Ainda não atualizado</span>';return '<span class="mut" title="'+esc(dt(u.em))+'">Atualizado '+dt(u.em)+' ('+ago(u.em)+')'+(u.ok?'':' · última tentativa falhou')+'</span>'}
 function status(i){const a=i.linhas.amazon,v=ap(i);
@@ -176,7 +176,7 @@ function initFiltros(){const el=$('#pn-fil');
  const opt=(o,v)=>Object.entries(o).map(([k,l])=>'<option value="'+k+'"'+(k===v?' selected':'')+'>'+esc(Array.isArray(l)?l[0]:l)+'</option>').join('');
  $('#menuq').innerHTML='<div class="row q"><input type="text" id="fq" placeholder="Buscar por título ou ASIN" value="'+esc(F.q)+'" aria-label="Buscar"></div>'
   +'<div class="row"><select id="ford" aria-label="Ordenar por">'+opt(ORD,F.ord)+'</select><button type="button" class="btn sm" id="fdir" title="Inverter ordem">'+(F.dir==='desc'?'↓ Decrescente':'↑ Crescente')+'</button></div><div class="mut" id="fcount"></div>';
- el.innerHTML='<div class="row"><span class="mut">Status</span><select id="fst" aria-label="Status">'+opt(FILTROS,F.st)+'</select></div><div class="row"><span class="mut">Grupo</span><select id="fgr" aria-label="Grupo">'+opt(Object.assign({'':'Todos os grupos',none:'Sem grupo'},gmap()),F.gr)+'</select></div><div class="row"><span class="mut">Linha</span><select id="fln" aria-label="Linha de preço">'+opt({'':'Qualquer linha',terceiros:'Com Terceiros ligada',usado:'Com Usado ligada'},F.ln)+'</select></div>'
+ el.innerHTML='<div class="row"><span class="mut">Status</span><select id="fst" aria-label="Status">'+opt(FILTROS,F.st)+'</select></div><div class="row"><span class="mut">Grupo</span><select id="fgr" aria-label="Grupo">'+opt(Object.assign({'':'Todos os grupos',none:'Sem grupo'},gmap()),F.gr)+'</select></div><div class="row"><span class="mut">Linha</span><select id="fln" aria-label="Linha de preço">'+opt({'':'Qualquer linha',terceiros:'Com Terceiros ligada'},F.ln)+'</select></div>'
   +'<div class="row"><span class="mut">Preço</span><input type="text" class="val" id="fmin" inputmode="decimal" placeholder="mín" value="'+esc(F.min)+'" aria-label="Preço mínimo"><input type="text" class="val" id="fmax" inputmode="decimal" placeholder="máx" value="'+esc(F.max)+'" aria-label="Preço máximo"></div>'
   +'<div class="row"><button type="button" class="btn sm" id="flimpa">Limpar filtros</button></div><div id="fagr"></div>';
  nFiltros();
@@ -349,7 +349,7 @@ function renderDir(){if(S.gsel!=null)return renderGrupo();const d=S.det,it=S.ite
    +'<td class="n num">'+(on?(l.atual!=null?brl(l.atual)+(l.automatico?'<div class="mut">'+(l.ligada?'':'Automático (Amazon sem oferta) · ')+esc(l.vendedor||'?')+(l.automatico.envio==='amazon'?' · enviado pela Amazon':l.automatico.envio==='terceiro'?' · enviado pelo vendedor':'')+'</div>':''):idx===0&&lido(it)==='nunca'?'<span class="mut">aguardando</span>':idx===0&&lido(it)==='erro'?'<span class="mut">erro na coleta</span>':'<span class="mut">sem oferta</span>'):'<span class="mut">—</span>')+'</td>'
    +'<td class="n num">'+(on?brl(l.min):'—')+'</td><td class="n num">'+(on?brl(l.max):'—')+'</td><td class="n num">'+(on&&l.variacao!=null?pct(l.variacao):'—')+'</td>'
    +(S.edit?'<td>'+(idx===0?'<span class="mut">sempre</span>':'<label><input type="checkbox" data-linha="'+k+'" '+(l.ligada?'checked':'')+'> coletar</label>')+'</td>':'')+'</tr>'});
- h+='</table></div>'+(S.edit?'<div class="mut" style="margin-top:6px">Aviso no Telegram quando a menor oferta (Amazon, Terceiros ou Usado) ficar igual ou abaixo do alvo. Deixe o campo vazio para remover o alvo. Ligar Terceiros ou Usado usa 2 requisições por rodada.</div>':'');
+ h+='</table></div>'+(S.edit?'<div class="mut" style="margin-top:6px">Aviso no Telegram quando a menor oferta (Amazon ou Terceiros, só produtos novos) ficar igual ou abaixo do alvo. Deixe o campo vazio para remover o alvo. Ligar Terceiros usa 2 requisições por rodada.</div>':'');
  h+='<div class="bar"><div class="seg">'+[7,14,30].map(n=>'<button type="button" data-n="'+n+'" aria-pressed="'+(n===S.dias)+'">'+n+' dias</button>').join('')+'</div><div class="seg"><button type="button" data-vz="grafico" aria-pressed="'+(S.visao==='grafico')+'">Gráfico</button><button type="button" data-vz="tabela" aria-pressed="'+(S.visao==='tabela')+'">Tabela</button></div>'+(S.visao==='grafico'?(S.zoom?'<div class="seg"><button type="button" data-zo="out">− Zoom</button><button type="button" data-zo="all">Tudo</button></div><span class="mut">'+dt(S.zoom[0])+' → '+dt(S.zoom[1])+'</span>':'<span class="mut">Arraste no gráfico para dar zoom</span>'):'')+'</div>';
  if(S.visao==='grafico')h+='<div class="chart" id="chart" tabindex="0"></div><div class="leg">'+LK.filter(k=>ativa(L[k])).map(k=>'<span><i class="key" style="--c:'+COR[k]+'"></i>'+NOME[k]+'</span>').join('')+'<span><i class="g"></i>Amazon não vendeu</span><span><i class="key" style="--c:var(--fg2);border-top-style:dashed"></i>Alvo</span></div>';
  else h+=tabelaColetas(d);

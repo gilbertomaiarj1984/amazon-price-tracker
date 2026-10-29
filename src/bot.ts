@@ -107,8 +107,8 @@ export class Bot {
         const p = await needP();
         if (!p) return;
         return this.d.send(fmt.lines(this.view(p)), [
-          (["terceiros", "usado"] as const).map((k) => ({
-            text: `${(k === "terceiros" ? p.terceirosOn : p.usadoOn) ? "Desligar" : "Ligar"} ${LINE_NAMES[k].split(" ")[0]}`,
+          (["terceiros"] as const).map((k) => ({
+            text: `${p.terceirosOn ? "Desligar" : "Ligar"} ${LINE_NAMES[k].split(" ")[0]}`,
             callback_data: `lg:${p.id}:${k}`,
           })),
         ]);
@@ -189,7 +189,7 @@ export class Bot {
     kb.push({ text: "Sem alvo por enquanto", callback_data: `nt:${p.id}` });
     const intro =
       preco != null
-        ? "Qual o preço-alvo? Vale para qualquer fonte (Amazon, Terceiros ou Usado). Responda com um valor (ex.: <code>449</code>) ou escolha abaixo."
+        ? "Qual o preço-alvo? Vale para qualquer fonte (Amazon ou Terceiros, só produtos novos). Responda com um valor (ex.: <code>449</code>) ou escolha abaixo."
         : "Não há oferta deste item agora. Defina um alvo para quando aparecer (ex.: <code>449</code>), ou escolha abaixo.";
     return this.d.send(intro, [kb]);
   }
@@ -197,7 +197,7 @@ export class Bot {
   private async setAlvo(p: Product, v: number): Promise<void> {
     const res = this.act.setAlvo(p, v);
     const view = this.view(p);
-    let msg = `Alvo do item #${view.num}: <b>${fmt.money(v)}</b>. Vale para qualquer fonte (Amazon, Terceiros ou Usado): aviso quando a menor oferta ficar igual ou abaixo.`;
+    let msg = `Alvo do item #${view.num}: <b>${fmt.money(v)}</b>. Vale para qualquer fonte (Amazon ou Terceiros, só produtos novos): aviso quando a menor oferta ficar igual ou abaixo.`;
     if (res.atual != null && res.atual <= v) msg += `\nO menor preço atual (${fmt.money(res.atual)}) já está dentro do alvo. Você será avisado na próxima coleta.`;
     return this.d.send(msg);
   }
@@ -252,9 +252,9 @@ export class Bot {
         return this.d.send(`Item #${n} removido. Os demais foram renumerados.`);
       }
       case "lg": {
-        const k = b === "terceiros" || b === "usado" ? b : null;
+        const k = b === "terceiros" ? b : null;
         if (!k) return;
-        const on = !(k === "terceiros" ? p.terceirosOn : p.usadoOn);
+        const on = !p.terceirosOn;
         this.act.setLinha(p, k, on);
         const nome = LINE_NAMES[k];
         if (!on) return this.d.send(`Linha <b>${nome}</b> desligada para #${this.store.numberOf(p.id)}. O histórico fica guardado.`);
