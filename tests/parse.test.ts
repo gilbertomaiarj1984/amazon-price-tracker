@@ -136,6 +136,11 @@ describe("parseOffersPanel", () => {
     const o = offers.find((x) => x.vendedor === "Casa & Som Outlet");
     expect(o).toMatchObject({ preco: 365, frete: 24.9, envio: "terceiro" });
   });
+  test("preço da oferta seguido de 'Entrega GRÁTIS' não vira frete (Amazon Global)", () => {
+    const html = '<div id="aod-offer"><div id="aod-offer-price"><span id="aod-price-0"><span class="aok-offscreen apex-pricetopay-accessibility-label">R$ 298,47</span></span></div><div id="aod-offer-soldBy"><div class="a-col-right"><span>Amazon Global</span></div></div><div id="aod-offer-shipsFrom"><div class="a-col-right"><span>Amazon</span></div></div><div>R$ 298,47 Entrega GRÁTIS 3 - 5 de Novembro</div></div>' + "x".repeat(600);
+    const [o] = parseOffersPanel(html);
+    expect(o).toMatchObject({ preco: 298.47, frete: null, vendidoPorAmazon: true });
+  });
   test("'Compra única' é tipo de compra, não condição usada", () => {
     expect(offers.filter((o) => o.condicao === "novo")).toHaveLength(5);
   });

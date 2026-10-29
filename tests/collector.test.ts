@@ -197,6 +197,16 @@ describe("Amazon sem oferta: melhor terceiro", () => {
     expect(card).toContain("não é da Amazon");
   });
 
+  test("caixa de compra de terceiro mais barata que a Amazon conta para o alvo, mesmo com Terceiros desligado", async () => {
+    const net = fakeNet({ product: fx("product-third-party.html").replace("R$ 389,00", "R$ 180,16"), panel: fx("offers-panel.html") });
+    const p = add();
+    store.setAlvo(p.id, 200);
+    const a = await collectOne(store, p, net.deps);
+    expect(a.ok && a.points.amazon?.preco).toBe(389);
+    expect(a.ok && a.alertas.map((x) => [x.evento.tipo, x.evento.linha, x.evento.preco])).toEqual([["alvo", "terceiros", 180.16]]);
+    expect(a.ok && a.alertas[0]!.vendedor).toBe("TechBras Store");
+  });
+
   test("alvo da Amazon dispara com o terceiro e o alerta avisa que é terceiro; 'voltou' só com a Amazon de verdade", async () => {
     const net = fakeNet(semAmazon());
     const p = add();

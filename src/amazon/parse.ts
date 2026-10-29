@@ -191,8 +191,9 @@ export function parseProductPage(html: string): ProductPage {
  * o frete real depende do CEP e é carregado depois, então fica null (desconhecido).
  */
 function parseFrete(block: HTMLElement): number | null {
-  const m = /(?:\+\s*)?R\$\s*([\d.]+(?:,\d{1,2})?)\s*(?:de\s+)?(?:frete|entrega)/i.exec(txt(block));
-  return m ? parseBRL(m[1]) : null;
+  // Exige "+ R$ X frete" ou "R$ X de frete": "R$ 298,47 Entrega GRÁTIS" é o preço da oferta seguido do aviso de entrega.
+  const m = /(?:\+\s*R\$\s*([\d.]+(?:,\d{1,2})?)\s*(?:de\s+)?|R\$\s*([\d.]+(?:,\d{1,2})?)\s+de\s+)(?:frete|entrega)/i.exec(txt(block));
+  return m ? parseBRL(m[1] ?? m[2]) : null;
 }
 
 const USED_RE = /usad|recondicion|seminov|como novo|muito bom|bom estado|aceit[aá]vel/i;

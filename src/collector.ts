@@ -107,6 +107,13 @@ async function collectInner(store: Store, product: Product, deps: CollectDeps): 
     return { linha, next: r.next };
   });
 
+  // A caixa de compra de um terceiro é o preço que o comprador vê: conta para o alvo mesmo com a linha Terceiros desligada.
+  if (!fallback && !fresh.terceirosOn && parsed.buyBox != null && !parsed.vendidoPorAmazon) {
+    const vendedor = parsed.buyBoxVendedor ?? "Desconhecido";
+    candidatos.push({ linha: "terceiros", preco: parsed.buyBox, minimoAnterior: store.minBefore(fresh.id, "terceiros", at) });
+    pontos.terceiros = { preco: parsed.buyBox, vendedor, fb: null };
+  }
+
   // Alvo único: vale para a menor oferta entre as fontes. O aviso de alvo substitui o de novo mínimo da mesma linha.
   const amazonState = nextStates.find((s) => s.linha === "amazon")!;
   const alvo = evaluateAlvo({ candidatos, alvo: store.getAlvo(fresh.id), ultimoAlertado: amazonState.next.ultimoAlertado });
